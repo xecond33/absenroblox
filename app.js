@@ -1269,6 +1269,21 @@
               line-height:1.5;
             ">
 
+              <strong>
+                📌 Absensi Manual
+              </strong>
+
+              <br>
+
+              Klik Day yang sudah kamu lakukan.
+              Setelah diklik, absensi langsung dicatat.
+
+              <br><br>
+
+              📍 Map dan ⏱️ waktu stay hanya
+              sebagai informasi. Website tidak
+              menjalankan atau memverifikasi timer.
+
             </div>
 
           </div>
