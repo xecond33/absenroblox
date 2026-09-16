@@ -1,6 +1,7 @@
 // ============================================================
 // AbsensiMap — app.js
 // Versi Manual — TANPA TIMER
+// Progress & Day dihitung TERPISAH PER MAP
 // ============================================================
 
 (async function () {
@@ -18,7 +19,6 @@
   let currentFilter = 'all';
   let searchQuery = '';
 
-  // Mencegah klik berkali-kali saat proses penyimpanan
   let savingProgress = false;
 
 
@@ -142,15 +142,12 @@
   function setupUI() {
 
     if ($userNameDisplay) {
-      $userNameDisplay.textContent =
-        user.username;
+      $userNameDisplay.textContent = user.username;
     }
 
     if ($userAvatarInitial) {
       $userAvatarInitial.textContent =
-        user.username
-          .charAt(0)
-          .toUpperCase();
+        user.username.charAt(0).toUpperCase();
     }
 
     if ($greetingTitle) {
@@ -158,36 +155,19 @@
         `Halo, ${user.username} 👋`;
     }
 
-
-    // --------------------------------------------------------
-    // ADMIN
-    // --------------------------------------------------------
-
     if (
       user.role === 'admin' &&
       $btnAdminLink
     ) {
-      $btnAdminLink.style.display =
-        'inline-flex';
+      $btnAdminLink.style.display = 'inline-flex';
     }
 
-
-    // --------------------------------------------------------
-    // LOGOUT
-    // --------------------------------------------------------
-
     if ($btnLogout) {
-
       $btnLogout.addEventListener(
         'click',
         () => Auth.logout()
       );
     }
-
-
-    // --------------------------------------------------------
-    // SEARCH
-    // --------------------------------------------------------
 
     if ($searchInput) {
 
@@ -195,18 +175,12 @@
         'input',
         function (e) {
 
-          searchQuery =
-            e.target.value;
+          searchQuery = e.target.value;
 
           renderCards();
         }
       );
     }
-
-
-    // --------------------------------------------------------
-    // FILTER
-    // --------------------------------------------------------
 
     if ($filterChips) {
 
@@ -225,10 +199,7 @@
           $filterChips
             .querySelectorAll('.chip')
             .forEach(function (c) {
-
-              c.classList.remove(
-                'active'
-              );
+              c.classList.remove('active');
             });
 
           chip.classList.add('active');
@@ -237,11 +208,6 @@
         }
       );
     }
-
-
-    // --------------------------------------------------------
-    // CARD CLICK
-    // --------------------------------------------------------
 
     if ($cardsGrid) {
 
@@ -261,27 +227,14 @@
 
     try {
 
-      // ------------------------------------------------------
-      // ITEMS
-      // ------------------------------------------------------
-
       const itemsData =
-        await Auth.apiFetch(
-          'getItems'
-        );
+        await Auth.apiFetch('getItems');
 
       items =
         itemsData.items || [];
 
-
-      // ------------------------------------------------------
-      // PROGRESS USER
-      // ------------------------------------------------------
-
       const progData =
-        await Auth.apiFetch(
-          'getProgress'
-        );
+        await Auth.apiFetch('getProgress');
 
       progress =
         progData.progress || {};
@@ -312,21 +265,18 @@
 
   function getTodayDate() {
 
-    const now =
-      new Date();
+    const now = new Date();
 
     const year =
       now.getFullYear();
 
     const month =
-      String(
-        now.getMonth() + 1
-      ).padStart(2, '0');
+      String(now.getMonth() + 1)
+        .padStart(2, '0');
 
     const day =
-      String(
-        now.getDate()
-      ).padStart(2, '0');
+      String(now.getDate())
+        .padStart(2, '0');
 
     return `${year}-${month}-${day}`;
   }
@@ -338,14 +288,40 @@
 
   function getProgressForItem(itemId) {
 
-    return progress[itemId] || [];
+    const data =
+      progress[itemId];
+
+    if (!Array.isArray(data)) {
+      return [];
+    }
+
+    return data
+      .map(Number)
+      .filter(Number.isFinite)
+      .sort((a, b) => a - b);
   }
 
 
   function getCompletedDaysCount(itemId) {
 
-    return getProgressForItem(itemId)
-      .length;
+    return getProgressForItem(itemId).length;
+  }
+
+
+  // ----------------------------------------------------------
+  // DAY TERAKHIR PER MAP
+  // ----------------------------------------------------------
+
+  function getLastCompletedDay(itemId) {
+
+    const days =
+      getProgressForItem(itemId);
+
+    if (!days.length) {
+      return 0;
+    }
+
+    return days[days.length - 1];
   }
 
 
@@ -355,9 +331,7 @@
   ) {
 
     return getProgressForItem(itemId)
-      .includes(
-        Number(dayNumber)
-      );
+      .includes(Number(dayNumber));
   }
 
 
@@ -366,9 +340,7 @@
     dayNumber
   ) {
 
-    if (
-      !progressDates[itemId]
-    ) {
+    if (!progressDates[itemId]) {
       return null;
     }
 
@@ -387,9 +359,7 @@
   function getStatus(item) {
 
     const completed =
-      getCompletedDaysCount(
-        item.id
-      );
+      getCompletedDaysCount(item.id);
 
     const duration =
       Number(item.duration_days) || 0;
@@ -398,9 +368,7 @@
       return 'idle';
     }
 
-    if (
-      completed >= duration
-    ) {
+    if (completed >= duration) {
       return 'done';
     }
 
@@ -432,9 +400,7 @@
     }
 
     const completed =
-      getCompletedDaysCount(
-        item.id
-      );
+      getCompletedDaysCount(item.id);
 
     return Math.min(
       100,
@@ -467,9 +433,7 @@
     ) {
 
       const dayNumber =
-        Number(
-          completedDays[i]
-        );
+        Number(completedDays[i]);
 
       const attendanceDate =
         dates[dayNumber] ||
@@ -522,9 +486,7 @@
       </span>
     `;
 
-    $toastContainer.appendChild(
-      toast
-    );
+    $toastContainer.appendChild(toast);
 
     setTimeout(function () {
 
@@ -532,9 +494,7 @@
         'toastOut 0.4s var(--ease) forwards';
 
       setTimeout(function () {
-
         toast.remove();
-
       }, 400);
 
     }, 3000);
@@ -551,8 +511,6 @@
     isCurrentlyCompleted
   ) {
 
-    // Jangan proses klik lain
-    // selama request sebelumnya belum selesai
     if (savingProgress) {
       return;
     }
@@ -561,12 +519,6 @@
 
     const targetCompleted =
       !isCurrentlyCompleted;
-
-
-    // --------------------------------------------------------
-    // SIMPAN DATA LAMA
-    // untuk rollback jika server gagal
-    // --------------------------------------------------------
 
     const oldProgress =
       JSON.parse(
@@ -581,23 +533,18 @@
 
     // --------------------------------------------------------
     // OPTIMISTIC UPDATE
-    // langsung tampilkan perubahan
     // --------------------------------------------------------
 
     if (!progress[itemId]) {
-
       progress[itemId] = [];
     }
 
-
     if (targetCompleted) {
 
-      // Tambahkan Day
       if (
         !progress[itemId]
-          .includes(
-            Number(dayNumber)
-          )
+          .map(Number)
+          .includes(Number(dayNumber))
       ) {
 
         progress[itemId].push(
@@ -605,12 +552,7 @@
         );
       }
 
-
-      // Simpan tanggal hari ini
-      if (
-        !progressDates[itemId]
-      ) {
-
+      if (!progressDates[itemId]) {
         progressDates[itemId] = {};
       }
 
@@ -619,14 +561,11 @@
       ] =
         getTodayDate();
 
-
     } else {
 
-      // Hapus Day
       progress[itemId] =
         progress[itemId].filter(
           function (d) {
-
             return (
               Number(d) !==
               Number(dayNumber)
@@ -634,29 +573,19 @@
           }
         );
 
+      if (progressDates[itemId]) {
 
-      // Hapus tanggal absensi
-      if (
-        progressDates[itemId]
-      ) {
+        delete progressDates[itemId][dayNumber];
 
-        delete progressDates[itemId][
-          dayNumber
-        ];
-
-        delete progressDates[itemId][
-          String(dayNumber)
-        ];
+        delete progressDates[itemId][String(dayNumber)];
       }
     }
 
-
-    // Langsung render
     renderAll();
 
 
     // --------------------------------------------------------
-    // KIRIM KE SERVER
+    // SERVER
     // --------------------------------------------------------
 
     try {
@@ -676,10 +605,6 @@
         );
 
 
-      // ------------------------------------------------------
-      // CEK RESPONSE SERVER
-      // ------------------------------------------------------
-
       if (
         !result ||
         (
@@ -696,24 +621,19 @@
 
 
       // ------------------------------------------------------
-      // JIKA ABSEN BERHASIL
+      // ABSEN BERHASIL
       // ------------------------------------------------------
 
       if (targetCompleted) {
 
-        // Pastikan Day tetap tercatat
-        if (
-          !progress[itemId]
-        ) {
-
+        if (!progress[itemId]) {
           progress[itemId] = [];
         }
 
         if (
           !progress[itemId]
-            .includes(
-              Number(dayNumber)
-            )
+            .map(Number)
+            .includes(Number(dayNumber))
         ) {
 
           progress[itemId].push(
@@ -721,13 +641,7 @@
           );
         }
 
-
-        // Gunakan tanggal dari server
-        // jika tersedia.
-        if (
-          !progressDates[itemId]
-        ) {
-
+        if (!progressDates[itemId]) {
           progressDates[itemId] = {};
         }
 
@@ -751,18 +665,7 @@
         );
       }
 
-
-      // ------------------------------------------------------
-      // PENTING:
-      // TIDAK ADA loadData() DI SINI
-      //
-      // Karena loadData() dapat mengambil tanggal berbeda
-      // dari browser dan menyebabkan status kembali
-      // "Belum Absen Hari Ini".
-      // ------------------------------------------------------
-
       renderAll();
-
 
     } catch (err) {
 
@@ -771,12 +674,6 @@
         err
       );
 
-
-      // ------------------------------------------------------
-      // ROLLBACK
-      // Kembalikan kondisi sebelum klik
-      // ------------------------------------------------------
-
       progress =
         oldProgress;
 
@@ -784,7 +681,6 @@
         oldProgressDates;
 
       renderAll();
-
 
       showToast(
         'Gagal menyimpan absensi ke server.',
@@ -804,14 +700,8 @@
 
   function handleCardClicks(e) {
 
-    // --------------------------------------------------------
-    // DAY
-    // --------------------------------------------------------
-
     const dayCell =
-      e.target.closest(
-        '.day-cell'
-      );
+      e.target.closest('.day-cell');
 
     if (dayCell) {
 
@@ -825,10 +715,7 @@
         );
 
       const isCompleted =
-        dayCell.classList.contains(
-          'checked'
-        );
-
+        dayCell.classList.contains('checked');
 
       toggleDayCompletion(
         itemId,
@@ -839,15 +726,8 @@
       return;
     }
 
-
-    // --------------------------------------------------------
-    // RESET
-    // --------------------------------------------------------
-
     const resetBtn =
-      e.target.closest(
-        '.btn-reset-prog'
-      );
+      e.target.closest('.btn-reset-prog');
 
     if (resetBtn) {
 
@@ -873,7 +753,6 @@
     if (!confirmed) {
       return;
     }
-
 
     try {
 
@@ -915,14 +794,7 @@
     let result =
       items.slice();
 
-
-    // --------------------------------------------------------
-    // SEARCH
-    // --------------------------------------------------------
-
-    if (
-      searchQuery.trim()
-    ) {
+    if (searchQuery.trim()) {
 
       const q =
         searchQuery
@@ -934,17 +806,13 @@
           function (item) {
 
             return (
-              String(
-                item.name || ''
-              )
+              String(item.name || '')
                 .toLowerCase()
                 .includes(q)
 
               ||
 
-              String(
-                item.map_name || ''
-              )
+              String(item.map_name || '')
                 .toLowerCase()
                 .includes(q)
             );
@@ -952,70 +820,46 @@
         );
     }
 
-
-    // --------------------------------------------------------
-    // FILTER
-    // --------------------------------------------------------
-
-    if (
-      currentFilter === '7'
-    ) {
+    if (currentFilter === '7') {
 
       result =
         result.filter(
           item =>
-            Number(
-              item.duration_days
-            ) === 7
+            Number(item.duration_days) === 7
         );
 
-    } else if (
-      currentFilter === '14'
-    ) {
+    } else if (currentFilter === '14') {
 
       result =
         result.filter(
           item =>
-            Number(
-              item.duration_days
-            ) === 14
+            Number(item.duration_days) === 14
         );
 
-    } else if (
-      currentFilter === '30'
-    ) {
+    } else if (currentFilter === '30') {
 
       result =
         result.filter(
           item =>
-            Number(
-              item.duration_days
-            ) === 30
+            Number(item.duration_days) === 30
         );
 
-    } else if (
-      currentFilter === 'running'
-    ) {
+    } else if (currentFilter === 'running') {
 
       result =
         result.filter(
           item =>
-            getStatus(item) ===
-            'running'
+            getStatus(item) === 'running'
         );
 
-    } else if (
-      currentFilter === 'done'
-    ) {
+    } else if (currentFilter === 'done') {
 
       result =
         result.filter(
           item =>
-            getStatus(item) ===
-            'done'
+            getStatus(item) === 'done'
         );
     }
-
 
     return result;
   }
@@ -1039,39 +883,26 @@
         const status =
           getStatus(item);
 
-        if (
-          status === 'running'
-        ) {
-
+        if (status === 'running') {
           running++;
         }
 
-        if (
-          status === 'done'
-        ) {
-
+        if (status === 'done') {
           done++;
         }
       }
     );
 
-
     if ($statTotal) {
-
-      $statTotal.textContent =
-        total;
+      $statTotal.textContent = total;
     }
 
     if ($statRunning) {
-
-      $statRunning.textContent =
-        running;
+      $statRunning.textContent = running;
     }
 
     if ($statDone) {
-
-      $statDone.textContent =
-        done;
+      $statDone.textContent = done;
     }
   }
 
@@ -1088,7 +919,6 @@
     let pendingCount = 0;
     let completedCount = 0;
 
-
     items.forEach(
       function (item) {
 
@@ -1096,13 +926,7 @@
           getTodayAttendance(item);
 
 
-        // ----------------------------------------------------
-        // SUDAH ABSEN
-        // ----------------------------------------------------
-
-        if (
-          todayDay !== null
-        ) {
+        if (todayDay !== null) {
 
           completedCount++;
 
@@ -1139,10 +963,6 @@
           `;
 
         } else {
-
-          // --------------------------------------------------
-          // BELUM ABSEN
-          // --------------------------------------------------
 
           pendingCount++;
 
@@ -1184,13 +1004,7 @@
     );
 
 
-    // --------------------------------------------------------
-    // EMPTY PENDING
-    // --------------------------------------------------------
-
-    if (
-      pendingCount === 0
-    ) {
+    if (pendingCount === 0) {
 
       pendingHTML = `
         <div class="today-empty">
@@ -1200,13 +1014,7 @@
     }
 
 
-    // --------------------------------------------------------
-    // EMPTY COMPLETED
-    // --------------------------------------------------------
-
-    if (
-      completedCount === 0
-    ) {
+    if (completedCount === 0) {
 
       completedHTML = `
         <div class="today-empty">
@@ -1216,27 +1024,16 @@
     }
 
 
-    if (
-      $todayPendingList
-    ) {
-
+    if ($todayPendingList) {
       $todayPendingList.innerHTML =
         pendingHTML;
     }
 
-
-    if (
-      $todayCompletedList
-    ) {
-
+    if ($todayCompletedList) {
       $todayCompletedList.innerHTML =
         completedHTML;
     }
 
-
-    // --------------------------------------------------------
-    // STAT TODAY
-    // --------------------------------------------------------
 
     if ($statToday) {
 
@@ -1256,22 +1053,14 @@
       filteredData();
 
 
-    // --------------------------------------------------------
-    // EMPTY
-    // --------------------------------------------------------
-
     if (!list.length) {
 
       if ($cardsGrid) {
-
-        $cardsGrid.style.display =
-          'none';
+        $cardsGrid.style.display = 'none';
       }
 
       if ($emptyState) {
-
-        $emptyState.style.display =
-          '';
+        $emptyState.style.display = '';
       }
 
       return;
@@ -1279,15 +1068,11 @@
 
 
     if ($cardsGrid) {
-
-      $cardsGrid.style.display =
-        '';
+      $cardsGrid.style.display = '';
     }
 
     if ($emptyState) {
-
-      $emptyState.style.display =
-        'none';
+      $emptyState.style.display = 'none';
     }
 
 
@@ -1299,22 +1084,27 @@
             getStatus(item);
 
           const statusLabel =
-            getStatusLabel(
-              status
-            );
+            getStatusLabel(status);
 
           const percent =
             calculatePct(item);
 
+          // ==================================================
+          // PENTING:
+          // SEMUA DATA DIAMBIL BERDASARKAN item.id
+          // ==================================================
+
+          const itemProgress =
+            getProgressForItem(item.id);
+
           const checkedCount =
-            getCompletedDaysCount(
-              item.id
-            );
+            itemProgress.length;
+
+          const lastDay =
+            getLastCompletedDay(item.id);
 
           const todayDay =
-            getTodayAttendance(
-              item
-            );
+            getTodayAttendance(item);
 
 
           // --------------------------------------------------
@@ -1324,9 +1114,7 @@
           let daysCells = '';
 
           const duration =
-            Number(
-              item.duration_days
-            ) || 0;
+            Number(item.duration_days) || 0;
 
 
           for (
@@ -1344,33 +1132,22 @@
             const isTodayAttendance =
               todayDay === i;
 
-
             let cls =
               'day-cell';
 
-
             if (isChecked) {
-
-              cls +=
-                ' checked';
+              cls += ' checked';
             }
 
-
-            if (
-              isTodayAttendance
-            ) {
-
-              cls +=
-                ' today-attendance';
+            if (isTodayAttendance) {
+              cls += ' today-attendance';
             }
 
 
             daysCells += `
               <div
                 class="${cls}"
-                data-item-id="${escHtml(
-                  item.id
-                )}"
+                data-item-id="${escHtml(item.id)}"
                 data-day="${i}"
                 title="Klik untuk ${
                   isChecked
@@ -1395,10 +1172,7 @@
 
           let todayStatusHTML = '';
 
-
-          if (
-            todayDay !== null
-          ) {
+          if (todayDay !== null) {
 
             todayStatusHTML = `
               <div style="
@@ -1434,6 +1208,24 @@
 
 
           // --------------------------------------------------
+          // PROGRESS LABEL
+          // --------------------------------------------------
+
+          let progressLabel;
+
+          if (lastDay > 0) {
+
+            progressLabel =
+              `Day ${lastDay}/${duration}`;
+
+          } else {
+
+            progressLabel =
+              `Day 0/${duration}`;
+          }
+
+
+          // --------------------------------------------------
           // CARD
           // --------------------------------------------------
 
@@ -1443,21 +1235,15 @@
               style="
                 animation-delay:${idx * 0.05}s
               "
-              data-card-id="${escHtml(
-                item.id
-              )}"
+              data-card-id="${escHtml(item.id)}"
             >
-
-              <!-- HEADER -->
 
               <div class="card-header">
 
                 <div class="card-title-group">
 
                   <span class="card-name">
-                    ${escHtml(
-                      item.name
-                    )}
+                    ${escHtml(item.name)}
                   </span>
 
                   <span class="card-duration-badge">
@@ -1468,8 +1254,6 @@
 
               </div>
 
-
-              <!-- MAP INFO -->
 
               <div class="card-map-info">
 
@@ -1520,12 +1304,15 @@
                 <div class="progress-info">
 
                   <span class="progress-text">
-                    Progress
-                    ${checkedCount}/${duration}
+
+                    ${progressLabel}
+
                   </span>
 
                   <span class="progress-pct">
+
                     ${percent}%
+
                   </span>
 
                 </div>
@@ -1555,9 +1342,7 @@
                 ">
 
                   Status:
-                  ${escHtml(
-                    statusLabel
-                  )}
+                  ${escHtml(statusLabel)}
 
                 </div>
 
@@ -1614,10 +1399,6 @@
       ).join('');
 
 
-    // --------------------------------------------------------
-    // RESET BUTTON
-    // --------------------------------------------------------
-
     renderResetButton();
   }
 
@@ -1634,29 +1415,21 @@
       );
 
     if (oldButton) {
-
       oldButton.remove();
     }
-
 
     if (
       Object.keys(progress).length === 0
     ) {
-
       return;
     }
-
 
     if (!$cardsGrid) {
-
       return;
     }
 
-
     const btn =
-      document.createElement(
-        'button'
-      );
+      document.createElement('button');
 
     btn.id =
       'btn-reset-my-prog';
@@ -1669,7 +1442,6 @@
 
     btn.innerText =
       'Reset Semua Progress Milikku';
-
 
     $cardsGrid.parentNode.insertBefore(
       btn,
@@ -1702,15 +1474,11 @@
       value === null ||
       value === undefined
     ) {
-
       return '';
     }
 
-
     const div =
-      document.createElement(
-        'div'
-      );
+      document.createElement('div');
 
     div.textContent =
       String(value);
