@@ -34,6 +34,7 @@
 window.firebaseConfig = {
   apiKey: "AIzaSyBIVg4h60nVyUR86ZNnxblcHouSs9sBI2g",
   authDomain: "absenmap-8e424.firebaseapp.com",
+  databaseURL: "https://console.firebase.google.com/project/absenmap-8e424/database/absenmap-8e424-default-rtdb/data/~2F",
   projectId: "absenmap-8e424",
   storageBucket: "absenmap-8e424.firebasestorage.app",
   messagingSenderId: "558749668297",
