@@ -6,7 +6,7 @@ const Auth = (() => {
   'use strict';
 
   // !!! GANTI URL DI BAWAH INI DENGAN URL WEB APP APPS SCRIPT-MU !!!
-  const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbyGB6OadVXdIC1A_dOPSdpXc-5LaHAswGtV3hLm0lVmzchJrKi4DR38hv3aFHEU807q/exec';
+  const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxvN0CIpK0hjWhxIPo8keYSnqB3r8AjnQxk1sWbesrewffbh8Bbd8P7FidAMgv_j6E/exec';
 
   let currentUser = null;
 
