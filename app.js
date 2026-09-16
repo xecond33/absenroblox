@@ -18,33 +18,61 @@
   let currentFilter = 'all';
   let searchQuery = '';
 
+  // Mencegah klik berkali-kali saat proses penyimpanan
+  let savingProgress = false;
+
 
   // ==========================================================
   // DOM ELEMENTS
   // ==========================================================
 
-  const $appContainer = document.getElementById('app-container');
-  const $globalLoader = document.getElementById('global-loader');
+  const $appContainer =
+    document.getElementById('app-container');
 
-  const $userNameDisplay = document.getElementById('user-name-display');
-  const $userAvatarInitial = document.getElementById('user-avatar-initial');
+  const $globalLoader =
+    document.getElementById('global-loader');
 
-  const $btnAdminLink = document.getElementById('btn-admin-link');
-  const $btnLogout = document.getElementById('btn-logout');
+  const $userNameDisplay =
+    document.getElementById('user-name-display');
 
-  const $greetingTitle = document.getElementById('greeting-title');
-  const $toastContainer = document.getElementById('toast-container');
+  const $userAvatarInitial =
+    document.getElementById('user-avatar-initial');
 
-  const $cardsGrid = document.getElementById('cards-grid');
-  const $emptyState = document.getElementById('empty-state');
+  const $btnAdminLink =
+    document.getElementById('btn-admin-link');
 
-  const $searchInput = document.getElementById('search-input');
-  const $filterChips = document.getElementById('filter-chips');
+  const $btnLogout =
+    document.getElementById('btn-logout');
 
-  const $statTotal = document.getElementById('stat-total');
-  const $statRunning = document.getElementById('stat-running');
-  const $statDone = document.getElementById('stat-done');
-  const $statToday = document.getElementById('stat-today');
+  const $greetingTitle =
+    document.getElementById('greeting-title');
+
+  const $toastContainer =
+    document.getElementById('toast-container');
+
+  const $cardsGrid =
+    document.getElementById('cards-grid');
+
+  const $emptyState =
+    document.getElementById('empty-state');
+
+  const $searchInput =
+    document.getElementById('search-input');
+
+  const $filterChips =
+    document.getElementById('filter-chips');
+
+  const $statTotal =
+    document.getElementById('stat-total');
+
+  const $statRunning =
+    document.getElementById('stat-running');
+
+  const $statDone =
+    document.getElementById('stat-done');
+
+  const $statToday =
+    document.getElementById('stat-today');
 
   const $todayPendingList =
     document.getElementById('today-pending-list');
@@ -71,8 +99,13 @@
 
       renderAll();
 
-      $appContainer.style.display = '';
-      $globalLoader.classList.add('hidden');
+      if ($appContainer) {
+        $appContainer.style.display = '';
+      }
+
+      if ($globalLoader) {
+        $globalLoader.classList.add('hidden');
+      }
 
       document.body.classList.add('loaded');
 
@@ -85,16 +118,19 @@
         'error'
       );
 
-      $globalLoader.innerHTML = `
-        <div style="
-          color:red;
-          font-weight:bold;
-          text-align:center;
-        ">
-          Gagal terhubung ke Apps Script API.<br>
-          Pastikan URL Apps Script sudah benar di auth.js.
-        </div>
-      `;
+      if ($globalLoader) {
+
+        $globalLoader.innerHTML = `
+          <div style="
+            color:red;
+            font-weight:bold;
+            text-align:center;
+          ">
+            Gagal terhubung ke Apps Script API.<br>
+            Pastikan URL Apps Script sudah benar di auth.js.
+          </div>
+        `;
+      }
     }
   }
 
@@ -106,12 +142,15 @@
   function setupUI() {
 
     if ($userNameDisplay) {
-      $userNameDisplay.textContent = user.username;
+      $userNameDisplay.textContent =
+        user.username;
     }
 
     if ($userAvatarInitial) {
       $userAvatarInitial.textContent =
-        user.username.charAt(0).toUpperCase();
+        user.username
+          .charAt(0)
+          .toUpperCase();
     }
 
     if ($greetingTitle) {
@@ -119,38 +158,56 @@
         `Halo, ${user.username} 👋`;
     }
 
-    // Tampilkan menu admin jika admin
+
+    // --------------------------------------------------------
+    // ADMIN
+    // --------------------------------------------------------
+
     if (
       user.role === 'admin' &&
       $btnAdminLink
     ) {
-      $btnAdminLink.style.display = 'inline-flex';
+      $btnAdminLink.style.display =
+        'inline-flex';
     }
 
-    // Logout
+
+    // --------------------------------------------------------
+    // LOGOUT
+    // --------------------------------------------------------
+
     if ($btnLogout) {
+
       $btnLogout.addEventListener(
         'click',
         () => Auth.logout()
       );
     }
 
-    // Search
+
+    // --------------------------------------------------------
+    // SEARCH
+    // --------------------------------------------------------
+
     if ($searchInput) {
 
       $searchInput.addEventListener(
         'input',
         function (e) {
 
-          searchQuery = e.target.value;
+          searchQuery =
+            e.target.value;
 
           renderCards();
-
         }
       );
     }
 
-    // Filter
+
+    // --------------------------------------------------------
+    // FILTER
+    // --------------------------------------------------------
+
     if ($filterChips) {
 
       $filterChips.addEventListener(
@@ -168,18 +225,24 @@
           $filterChips
             .querySelectorAll('.chip')
             .forEach(function (c) {
-              c.classList.remove('active');
+
+              c.classList.remove(
+                'active'
+              );
             });
 
           chip.classList.add('active');
 
           renderCards();
-
         }
       );
     }
 
-    // Klik Day / tombol reset
+
+    // --------------------------------------------------------
+    // CARD CLICK
+    // --------------------------------------------------------
+
     if ($cardsGrid) {
 
       $cardsGrid.addEventListener(
@@ -198,17 +261,27 @@
 
     try {
 
-      // Ambil daftar map/item
+      // ------------------------------------------------------
+      // ITEMS
+      // ------------------------------------------------------
+
       const itemsData =
-        await Auth.apiFetch('getItems');
+        await Auth.apiFetch(
+          'getItems'
+        );
 
       items =
         itemsData.items || [];
 
 
-      // Ambil progress user
+      // ------------------------------------------------------
+      // PROGRESS USER
+      // ------------------------------------------------------
+
       const progData =
-        await Auth.apiFetch('getProgress');
+        await Auth.apiFetch(
+          'getProgress'
+        );
 
       progress =
         progData.progress || {};
@@ -218,7 +291,10 @@
 
     } catch (e) {
 
-      console.error('Load data error:', e);
+      console.error(
+        'Load data error:',
+        e
+      );
 
       showToast(
         'Gagal memuat data absensi.',
@@ -236,18 +312,21 @@
 
   function getTodayDate() {
 
-    const now = new Date();
+    const now =
+      new Date();
 
     const year =
       now.getFullYear();
 
     const month =
-      String(now.getMonth() + 1)
-        .padStart(2, '0');
+      String(
+        now.getMonth() + 1
+      ).padStart(2, '0');
 
     const day =
-      String(now.getDate())
-        .padStart(2, '0');
+      String(
+        now.getDate()
+      ).padStart(2, '0');
 
     return `${year}-${month}-${day}`;
   }
@@ -265,18 +344,27 @@
 
   function getCompletedDaysCount(itemId) {
 
-    return getProgressForItem(itemId).length;
+    return getProgressForItem(itemId)
+      .length;
   }
 
 
-  function isDayCompleted(itemId, dayNumber) {
+  function isDayCompleted(
+    itemId,
+    dayNumber
+  ) {
 
     return getProgressForItem(itemId)
-      .includes(Number(dayNumber));
+      .includes(
+        Number(dayNumber)
+      );
   }
 
 
-  function getDayDate(itemId, dayNumber) {
+  function getDayDate(
+    itemId,
+    dayNumber
+  ) {
 
     if (
       !progressDates[itemId]
@@ -299,7 +387,9 @@
   function getStatus(item) {
 
     const completed =
-      getCompletedDaysCount(item.id);
+      getCompletedDaysCount(
+        item.id
+      );
 
     const duration =
       Number(item.duration_days) || 0;
@@ -308,7 +398,9 @@
       return 'idle';
     }
 
-    if (completed >= duration) {
+    if (
+      completed >= duration
+    ) {
       return 'done';
     }
 
@@ -340,7 +432,9 @@
     }
 
     const completed =
-      getCompletedDaysCount(item.id);
+      getCompletedDaysCount(
+        item.id
+      );
 
     return Math.min(
       100,
@@ -373,7 +467,9 @@
     ) {
 
       const dayNumber =
-        Number(completedDays[i]);
+        Number(
+          completedDays[i]
+        );
 
       const attendanceDate =
         dates[dayNumber] ||
@@ -381,7 +477,8 @@
 
       if (
         attendanceDate &&
-        String(attendanceDate).substring(0, 10) === today
+        String(attendanceDate)
+          .substring(0, 10) === today
       ) {
 
         return dayNumber;
@@ -401,7 +498,9 @@
     type = 'info'
   ) {
 
-    if (!$toastContainer) return;
+    if (!$toastContainer) {
+      return;
+    }
 
     const toast =
       document.createElement('div');
@@ -418,10 +517,14 @@
 
     toast.innerHTML = `
       ${icon}
-      <span>${escHtml(message)}</span>
+      <span>
+        ${escHtml(message)}
+      </span>
     `;
 
-    $toastContainer.appendChild(toast);
+    $toastContainer.appendChild(
+      toast
+    );
 
     setTimeout(function () {
 
@@ -429,7 +532,9 @@
         'toastOut 0.4s var(--ease) forwards';
 
       setTimeout(function () {
+
         toast.remove();
+
       }, 400);
 
     }, 3000);
@@ -446,15 +551,41 @@
     isCurrentlyCompleted
   ) {
 
+    // Jangan proses klik lain
+    // selama request sebelumnya belum selesai
+    if (savingProgress) {
+      return;
+    }
+
+    savingProgress = true;
+
     const targetCompleted =
       !isCurrentlyCompleted;
 
 
     // --------------------------------------------------------
-    // Optimistic update
+    // SIMPAN DATA LAMA
+    // untuk rollback jika server gagal
+    // --------------------------------------------------------
+
+    const oldProgress =
+      JSON.parse(
+        JSON.stringify(progress)
+      );
+
+    const oldProgressDates =
+      JSON.parse(
+        JSON.stringify(progressDates)
+      );
+
+
+    // --------------------------------------------------------
+    // OPTIMISTIC UPDATE
+    // langsung tampilkan perubahan
     // --------------------------------------------------------
 
     if (!progress[itemId]) {
+
       progress[itemId] = [];
     }
 
@@ -464,7 +595,9 @@
       // Tambahkan Day
       if (
         !progress[itemId]
-          .includes(Number(dayNumber))
+          .includes(
+            Number(dayNumber)
+          )
       ) {
 
         progress[itemId].push(
@@ -472,39 +605,58 @@
         );
       }
 
-      // Simpan tanggal lokal sementara
-      if (!progressDates[itemId]) {
+
+      // Simpan tanggal hari ini
+      if (
+        !progressDates[itemId]
+      ) {
+
         progressDates[itemId] = {};
       }
 
-      progressDates[itemId][dayNumber] =
+      progressDates[itemId][
+        String(dayNumber)
+      ] =
         getTodayDate();
+
 
     } else {
 
       // Hapus Day
       progress[itemId] =
         progress[itemId].filter(
-          d =>
-            Number(d) !==
-            Number(dayNumber)
+          function (d) {
+
+            return (
+              Number(d) !==
+              Number(dayNumber)
+            );
+          }
         );
 
-      // Hapus tanggalnya
-      if (progressDates[itemId]) {
 
-        delete progressDates[itemId][dayNumber];
+      // Hapus tanggal absensi
+      if (
+        progressDates[itemId]
+      ) {
 
-        delete progressDates[itemId][String(dayNumber)];
+        delete progressDates[itemId][
+          dayNumber
+        ];
+
+        delete progressDates[itemId][
+          String(dayNumber)
+        ];
       }
     }
 
 
+    // Langsung render
     renderAll();
 
 
     // --------------------------------------------------------
-    // Kirim ke Apps Script
+    // KIRIM KE SERVER
     // --------------------------------------------------------
 
     try {
@@ -514,38 +666,100 @@
           'updateProgress',
           {
             itemId: itemId,
-            dayNumber: Number(dayNumber),
-            completed: targetCompleted,
-            date: getTodayDate()
+
+            dayNumber:
+              Number(dayNumber),
+
+            completed:
+              targetCompleted
           }
         );
 
 
+      // ------------------------------------------------------
+      // CEK RESPONSE SERVER
+      // ------------------------------------------------------
+
       if (
-        result &&
-        result.message
+        !result ||
+        (
+          result.error &&
+          !result.message
+        )
       ) {
 
-        if (targetCompleted) {
-
-          showToast(
-            `Day ${dayNumber} berhasil dicatat sebagai absensi hari ini.`,
-            'success'
-          );
-
-        } else {
-
-          showToast(
-            `Absensi Day ${dayNumber} dibatalkan.`,
-            'info'
-          );
-        }
+        throw new Error(
+          result.error ||
+          'Server gagal menyimpan data.'
+        );
       }
 
 
-      // Ambil ulang dari server supaya data
-      // benar-benar sinkron
-      await loadData();
+      // ------------------------------------------------------
+      // JIKA ABSEN BERHASIL
+      // ------------------------------------------------------
+
+      if (targetCompleted) {
+
+        // Pastikan Day tetap tercatat
+        if (
+          !progress[itemId]
+        ) {
+
+          progress[itemId] = [];
+        }
+
+        if (
+          !progress[itemId]
+            .includes(
+              Number(dayNumber)
+            )
+        ) {
+
+          progress[itemId].push(
+            Number(dayNumber)
+          );
+        }
+
+
+        // Gunakan tanggal dari server
+        // jika tersedia.
+        if (
+          !progressDates[itemId]
+        ) {
+
+          progressDates[itemId] = {};
+        }
+
+        progressDates[itemId][
+          String(dayNumber)
+        ] =
+          result.date ||
+          getTodayDate();
+
+
+        showToast(
+          `Day ${dayNumber} berhasil dicatat sebagai absensi hari ini.`,
+          'success'
+        );
+
+      } else {
+
+        showToast(
+          `Absensi Day ${dayNumber} dibatalkan.`,
+          'info'
+        );
+      }
+
+
+      // ------------------------------------------------------
+      // PENTING:
+      // TIDAK ADA loadData() DI SINI
+      //
+      // Karena loadData() dapat mengambil tanggal berbeda
+      // dari browser dan menyebabkan status kembali
+      // "Belum Absen Hari Ini".
+      // ------------------------------------------------------
 
       renderAll();
 
@@ -558,25 +772,28 @@
       );
 
 
-      // Jika gagal, reload data server
-      try {
+      // ------------------------------------------------------
+      // ROLLBACK
+      // Kembalikan kondisi sebelum klik
+      // ------------------------------------------------------
 
-        await loadData();
+      progress =
+        oldProgress;
 
-      } catch (reloadError) {
-
-        console.error(
-          'Reload error:',
-          reloadError
-        );
-      }
+      progressDates =
+        oldProgressDates;
 
       renderAll();
+
 
       showToast(
         'Gagal menyimpan absensi ke server.',
         'error'
       );
+
+    } finally {
+
+      savingProgress = false;
     }
   }
 
@@ -588,11 +805,13 @@
   function handleCardClicks(e) {
 
     // --------------------------------------------------------
-    // Klik Day
+    // DAY
     // --------------------------------------------------------
 
     const dayCell =
-      e.target.closest('.day-cell');
+      e.target.closest(
+        '.day-cell'
+      );
 
     if (dayCell) {
 
@@ -622,7 +841,7 @@
 
 
     // --------------------------------------------------------
-    // Reset progress
+    // RESET
     // --------------------------------------------------------
 
     const resetBtn =
@@ -697,7 +916,10 @@
       items.slice();
 
 
-    // Search
+    // --------------------------------------------------------
+    // SEARCH
+    // --------------------------------------------------------
+
     if (
       searchQuery.trim()
     ) {
@@ -708,46 +930,67 @@
           .trim();
 
       result =
-        result.filter(function (item) {
+        result.filter(
+          function (item) {
 
-          return (
-            String(item.name || '')
-              .toLowerCase()
-              .includes(q)
+            return (
+              String(
+                item.name || ''
+              )
+                .toLowerCase()
+                .includes(q)
 
-            ||
+              ||
 
-            String(item.map_name || '')
-              .toLowerCase()
-              .includes(q)
-          );
-        });
+              String(
+                item.map_name || ''
+              )
+                .toLowerCase()
+                .includes(q)
+            );
+          }
+        );
     }
 
 
-    // Filter duration
-    if (currentFilter === '7') {
+    // --------------------------------------------------------
+    // FILTER
+    // --------------------------------------------------------
+
+    if (
+      currentFilter === '7'
+    ) {
 
       result =
         result.filter(
           item =>
-            Number(item.duration_days) === 7
+            Number(
+              item.duration_days
+            ) === 7
         );
 
-    } else if (currentFilter === '14') {
+    } else if (
+      currentFilter === '14'
+    ) {
 
       result =
         result.filter(
           item =>
-            Number(item.duration_days) === 14
+            Number(
+              item.duration_days
+            ) === 14
         );
 
-    } else if (currentFilter === '30') {
+    } else if (
+      currentFilter === '30'
+    ) {
 
       result =
         result.filter(
           item =>
-            Number(item.duration_days) === 30
+            Number(
+              item.duration_days
+            ) === 30
         );
 
     } else if (
@@ -757,7 +1000,8 @@
       result =
         result.filter(
           item =>
-            getStatus(item) === 'running'
+            getStatus(item) ===
+            'running'
         );
 
     } else if (
@@ -767,7 +1011,8 @@
       result =
         result.filter(
           item =>
-            getStatus(item) === 'done'
+            getStatus(item) ===
+            'done'
         );
     }
 
@@ -788,32 +1033,43 @@
     let running = 0;
     let done = 0;
 
-    items.forEach(function (item) {
+    items.forEach(
+      function (item) {
 
-      const status =
-        getStatus(item);
+        const status =
+          getStatus(item);
 
-      if (status === 'running') {
-        running++;
+        if (
+          status === 'running'
+        ) {
+
+          running++;
+        }
+
+        if (
+          status === 'done'
+        ) {
+
+          done++;
+        }
       }
-
-      if (status === 'done') {
-        done++;
-      }
-    });
+    );
 
 
     if ($statTotal) {
+
       $statTotal.textContent =
         total;
     }
 
     if ($statRunning) {
+
       $statRunning.textContent =
         running;
     }
 
     if ($statDone) {
+
       $statDone.textContent =
         done;
     }
@@ -833,99 +1089,108 @@
     let completedCount = 0;
 
 
-    items.forEach(function (item) {
+    items.forEach(
+      function (item) {
 
-      const todayDay =
-        getTodayAttendance(item);
+        const todayDay =
+          getTodayAttendance(item);
 
 
-      // ------------------------------------------------------
-      // SUDAH ABSEN HARI INI
-      // ------------------------------------------------------
+        // ----------------------------------------------------
+        // SUDAH ABSEN
+        // ----------------------------------------------------
 
-      if (todayDay !== null) {
+        if (
+          todayDay !== null
+        ) {
 
-        completedCount++;
+          completedCount++;
 
-        completedHTML += `
-          <div class="today-item">
+          completedHTML += `
+            <div class="today-item">
 
-            <div class="today-item-name">
+              <div class="today-item-name">
 
-              <div class="dot green"></div>
+                <div class="dot green"></div>
 
-              ${escHtml(item.name)}
+                ${escHtml(item.name)}
+
+              </div>
+
+              <div class="today-item-info">
+
+                <span>
+                  ✓ Sudah Absen Hari Ini
+                </span>
+
+                <span>
+                  📅 Day ${todayDay}/${item.duration_days}
+                </span>
+
+                <span>
+                  📍 ${escHtml(
+                    item.map_name || '-'
+                  )}
+                </span>
+
+              </div>
 
             </div>
+          `;
 
-            <div class="today-item-info">
+        } else {
 
-              <span>
-                ✓ Sudah Absen Hari Ini
-              </span>
+          // --------------------------------------------------
+          // BELUM ABSEN
+          // --------------------------------------------------
 
-              <span>
-                📅 Day ${todayDay}/${item.duration_days}
-              </span>
+          pendingCount++;
 
-              <span>
-                📍 ${escHtml(item.map_name || '-')}
-              </span>
+          pendingHTML += `
+            <div class="today-item">
+
+              <div class="today-item-name">
+
+                <div class="dot red"></div>
+
+                ${escHtml(item.name)}
+
+              </div>
+
+              <div class="today-item-info">
+
+                <span>
+                  ⚠ Belum Absen Hari Ini
+                </span>
+
+                <span>
+                  📍 ${escHtml(
+                    item.map_name || '-'
+                  )}
+                </span>
+
+                <span>
+                  ⏱️ Wajib stay ${
+                    item.required_minutes || 0
+                  } menit
+                </span>
+
+              </div>
 
             </div>
-
-          </div>
-        `;
-
+          `;
+        }
       }
-
-      // ------------------------------------------------------
-      // BELUM ABSEN HARI INI
-      // ------------------------------------------------------
-
-      else {
-
-        pendingCount++;
-
-        pendingHTML += `
-          <div class="today-item">
-
-            <div class="today-item-name">
-
-              <div class="dot red"></div>
-
-              ${escHtml(item.name)}
-
-            </div>
-
-            <div class="today-item-info">
-
-              <span>
-                ⚠ Belum Absen Hari Ini
-              </span>
-
-              <span>
-                📍 ${escHtml(item.map_name || '-')}
-              </span>
-
-              <span>
-                ⏱️ Wajib stay ${item.required_minutes || 0} menit
-              </span>
-
-            </div>
-
-          </div>
-        `;
-      }
-
-    });
+    );
 
 
     // --------------------------------------------------------
-    // EMPTY STATE
+    // EMPTY PENDING
     // --------------------------------------------------------
 
-    if (pendingCount === 0) {
+    if (
+      pendingCount === 0
+    ) {
 
       pendingHTML = `
         <div class="today-empty">
@@ -935,7 +1200,13 @@
     }
 
 
-    if (completedCount === 0) {
+    // --------------------------------------------------------
+    // EMPTY COMPLETED
+    // --------------------------------------------------------
+
+    if (
+      completedCount === 0
+    ) {
 
       completedHTML = `
         <div class="today-empty">
@@ -945,21 +1216,28 @@
     }
 
 
-    if ($todayPendingList) {
+    if (
+      $todayPendingList
+    ) {
 
       $todayPendingList.innerHTML =
         pendingHTML;
     }
 
 
-    if ($todayCompletedList) {
+    if (
+      $todayCompletedList
+    ) {
 
       $todayCompletedList.innerHTML =
         completedHTML;
     }
 
 
-    // Statistik hari ini
+    // --------------------------------------------------------
+    // STAT TODAY
+    // --------------------------------------------------------
+
     if ($statToday) {
 
       $statToday.textContent =
@@ -978,15 +1256,22 @@
       filteredData();
 
 
-    // Empty
+    // --------------------------------------------------------
+    // EMPTY
+    // --------------------------------------------------------
+
     if (!list.length) {
 
       if ($cardsGrid) {
-        $cardsGrid.style.display = 'none';
+
+        $cardsGrid.style.display =
+          'none';
       }
 
       if ($emptyState) {
-        $emptyState.style.display = '';
+
+        $emptyState.style.display =
+          '';
       }
 
       return;
@@ -995,301 +1280,338 @@
 
     if ($cardsGrid) {
 
-      $cardsGrid.style.display = '';
+      $cardsGrid.style.display =
+        '';
     }
 
     if ($emptyState) {
 
-      $emptyState.style.display = 'none';
+      $emptyState.style.display =
+        'none';
     }
 
 
     $cardsGrid.innerHTML =
-      list.map(function (item, idx) {
+      list.map(
+        function (item, idx) {
 
-        const status =
-          getStatus(item);
+          const status =
+            getStatus(item);
 
-        const statusLabel =
-          getStatusLabel(status);
-
-        const percent =
-          calculatePct(item);
-
-        const checkedCount =
-          getCompletedDaysCount(item.id);
-
-        const todayDay =
-          getTodayAttendance(item);
-
-
-        // ------------------------------------------------------
-        // DAYS
-        // ------------------------------------------------------
-
-        let daysCells = '';
-
-        const duration =
-          Number(item.duration_days) || 0;
-
-
-        for (
-          let i = 1;
-          i <= duration;
-          i++
-        ) {
-
-          const isChecked =
-            isDayCompleted(
-              item.id,
-              i
+          const statusLabel =
+            getStatusLabel(
+              status
             );
 
-          const isTodayAttendance =
-            todayDay === i;
+          const percent =
+            calculatePct(item);
+
+          const checkedCount =
+            getCompletedDaysCount(
+              item.id
+            );
+
+          const todayDay =
+            getTodayAttendance(
+              item
+            );
 
 
-          let cls =
-            'day-cell';
+          // --------------------------------------------------
+          // DAYS
+          // --------------------------------------------------
+
+          let daysCells = '';
+
+          const duration =
+            Number(
+              item.duration_days
+            ) || 0;
 
 
-          if (isChecked) {
-            cls += ' checked';
+          for (
+            let i = 1;
+            i <= duration;
+            i++
+          ) {
+
+            const isChecked =
+              isDayCompleted(
+                item.id,
+                i
+              );
+
+            const isTodayAttendance =
+              todayDay === i;
+
+
+            let cls =
+              'day-cell';
+
+
+            if (isChecked) {
+
+              cls +=
+                ' checked';
+            }
+
+
+            if (
+              isTodayAttendance
+            ) {
+
+              cls +=
+                ' today-attendance';
+            }
+
+
+            daysCells += `
+              <div
+                class="${cls}"
+                data-item-id="${escHtml(
+                  item.id
+                )}"
+                data-day="${i}"
+                title="Klik untuk ${
+                  isChecked
+                    ? 'membatalkan'
+                    : 'mencatat'
+                } absensi Day ${i}"
+              >
+                ${
+                  isChecked
+                    ? '✓'
+                    : ''
+                }
+                ${i}
+              </div>
+            `;
           }
 
 
-          if (isTodayAttendance) {
-            cls += ' today-attendance';
+          // --------------------------------------------------
+          // TODAY STATUS
+          // --------------------------------------------------
+
+          let todayStatusHTML = '';
+
+
+          if (
+            todayDay !== null
+          ) {
+
+            todayStatusHTML = `
+              <div style="
+                margin-top:10px;
+                padding:10px 12px;
+                border-radius:10px;
+                background:rgba(34,197,94,.10);
+                color:#16a34a;
+                font-size:.82rem;
+                font-weight:700;
+              ">
+                ✓ Sudah Absen Hari Ini —
+                Day ${todayDay}
+              </div>
+            `;
+
+          } else {
+
+            todayStatusHTML = `
+              <div style="
+                margin-top:10px;
+                padding:10px 12px;
+                border-radius:10px;
+                background:rgba(239,68,68,.08);
+                color:#dc2626;
+                font-size:.82rem;
+                font-weight:700;
+              ">
+                ⚠ Belum Absen Hari Ini
+              </div>
+            `;
           }
 
 
-          daysCells += `
+          // --------------------------------------------------
+          // CARD
+          // --------------------------------------------------
+
+          return `
             <div
-              class="${cls}"
-              data-item-id="${escHtml(item.id)}"
-              data-day="${i}"
-              title="Klik untuk ${
-                isChecked
-                  ? 'membatalkan'
-                  : 'mencatat'
-              } absensi Day ${i}"
+              class="card"
+              style="
+                animation-delay:${idx * 0.05}s
+              "
+              data-card-id="${escHtml(
+                item.id
+              )}"
             >
-              ${
-                isChecked
-                  ? '✓'
-                  : ''
-              }
-              ${i}
-            </div>
-          `;
-        }
 
+              <!-- HEADER -->
 
-        // ------------------------------------------------------
-        // TODAY STATUS
-        // ------------------------------------------------------
+              <div class="card-header">
 
-        let todayStatusHTML = '';
+                <div class="card-title-group">
 
-        if (todayDay !== null) {
+                  <span class="card-name">
+                    ${escHtml(
+                      item.name
+                    )}
+                  </span>
 
-          todayStatusHTML = `
-            <div style="
-              margin-top:10px;
-              padding:10px 12px;
-              border-radius:10px;
-              background:rgba(34,197,94,.10);
-              color:#16a34a;
-              font-size:.82rem;
-              font-weight:700;
-            ">
-              ✓ Sudah Absen Hari Ini — Day ${todayDay}
-            </div>
-          `;
+                  <span class="card-duration-badge">
+                    ${duration} Hari
+                  </span>
 
-        } else {
-
-          todayStatusHTML = `
-            <div style="
-              margin-top:10px;
-              padding:10px 12px;
-              border-radius:10px;
-              background:rgba(239,68,68,.08);
-              color:#dc2626;
-              font-size:.82rem;
-              font-weight:700;
-            ">
-              ⚠ Belum Absen Hari Ini
-            </div>
-          `;
-        }
-
-
-        // ------------------------------------------------------
-        // CARD
-        // ------------------------------------------------------
-
-        return `
-          <div
-            class="card"
-            style="animation-delay:${idx * 0.05}s"
-            data-card-id="${escHtml(item.id)}"
-          >
-
-            <!-- HEADER -->
-
-            <div class="card-header">
-
-              <div class="card-title-group">
-
-                <span class="card-name">
-                  ${escHtml(item.name)}
-                </span>
-
-                <span class="card-duration-badge">
-                  ${duration} Hari
-                </span>
-
-              </div>
-
-            </div>
-
-
-            <!-- MAP INFO -->
-
-            <div class="card-map-info">
-
-              <div class="card-map-info-row">
-
-                <span class="info-icon">
-                  📍
-                </span>
-
-                <span class="info-label">
-                  Map:
-                </span>
-
-                <span class="info-value">
-                  ${escHtml(item.map_name || '-')}
-                </span>
+                </div>
 
               </div>
 
 
-              <div class="card-map-info-row">
+              <!-- MAP INFO -->
 
-                <span class="info-icon">
-                  ⏱️
-                </span>
+              <div class="card-map-info">
 
-                <span class="info-label">
-                  Stay wajib:
-                </span>
+                <div class="card-map-info-row">
 
-                <span class="info-value">
-                  ${item.required_minutes || 0} Menit
-                </span>
+                  <span class="info-icon">
+                    📍
+                  </span>
 
-              </div>
+                  <span class="info-label">
+                    Map:
+                  </span>
 
-            </div>
+                  <span class="info-value">
+                    ${escHtml(
+                      item.map_name || '-'
+                    )}
+                  </span>
 
-
-            <!-- PROGRESS -->
-
-            <div class="card-progress">
-
-              <div class="progress-info">
-
-                <span class="progress-text">
-                  Progress
-                  ${checkedCount}/${duration}
-                </span>
-
-                <span class="progress-pct">
-                  ${percent}%
-                </span>
-
-              </div>
+                </div>
 
 
-              <div class="progress-bar">
+                <div class="card-map-info-row">
 
-                <div
-                  class="progress-fill ${
-                    status === 'done'
-                      ? 'complete'
-                      : ''
-                  }"
-                  style="width:${percent}%"
-                ></div>
+                  <span class="info-icon">
+                    ⏱️
+                  </span>
+
+                  <span class="info-label">
+                    Stay wajib:
+                  </span>
+
+                  <span class="info-value">
+                    ${
+                      item.required_minutes || 0
+                    } Menit
+                  </span>
+
+                </div>
 
               </div>
 
+
+              <!-- PROGRESS -->
+
+              <div class="card-progress">
+
+                <div class="progress-info">
+
+                  <span class="progress-text">
+                    Progress
+                    ${checkedCount}/${duration}
+                  </span>
+
+                  <span class="progress-pct">
+                    ${percent}%
+                  </span>
+
+                </div>
+
+
+                <div class="progress-bar">
+
+                  <div
+                    class="progress-fill ${
+                      status === 'done'
+                        ? 'complete'
+                        : ''
+                    }"
+                    style="
+                      width:${percent}%
+                    "
+                  ></div>
+
+                </div>
+
+
+                <div style="
+                  font-size:.8rem;
+                  margin-top:8px;
+                  font-weight:600;
+                  color:var(--text-muted);
+                ">
+
+                  Status:
+                  ${escHtml(
+                    statusLabel
+                  )}
+
+                </div>
+
+                ${todayStatusHTML}
+
+              </div>
+
+
+              <!-- DAYS -->
+
+              <div class="card-days">
+
+                <div class="card-days-grid">
+
+                  ${daysCells}
+
+                </div>
+
+              </div>
+
+
+              <!-- MANUAL INFO -->
 
               <div style="
-                font-size:.8rem;
-                margin-top:8px;
-                font-weight:600;
+                margin-top:14px;
+                padding:12px;
+                border-radius:10px;
+                background:var(--bg-secondary, #f5f5f5);
+                font-size:.75rem;
                 color:var(--text-muted);
+                line-height:1.5;
               ">
 
-                Status:
-                ${escHtml(statusLabel)}
+                <strong>
+                  📌 Absensi Manual
+                </strong>
+
+                <br>
+
+                Klik Day yang sudah kamu lakukan.
+                Setelah diklik, absensi langsung dicatat.
+
+                <br><br>
+
+                📍 Map dan ⏱️ waktu stay hanya
+                sebagai informasi. Website tidak
+                menjalankan atau memverifikasi timer.
 
               </div>
 
-              ${todayStatusHTML}
-
             </div>
-
-
-            <!-- DAYS -->
-
-            <div class="card-days">
-
-              <div class="card-days-grid">
-
-                ${daysCells}
-
-              </div>
-
-            </div>
-
-
-            <!-- MANUAL INFO -->
-
-            <div style="
-              margin-top:14px;
-              padding:12px;
-              border-radius:10px;
-              background:var(--bg-secondary, #f5f5f5);
-              font-size:.75rem;
-              color:var(--text-muted);
-              line-height:1.5;
-            ">
-
-              <strong>
-                📌 Absensi Manual
-              </strong>
-
-              <br>
-
-              Klik Day yang sudah kamu lakukan.
-              Setelah diklik, absensi langsung dicatat.
-
-              <br><br>
-
-              📍 Map dan ⏱️ waktu stay hanya
-              sebagai informasi. Website tidak
-              menjalankan atau memverifikasi timer.
-
-            </div>
-
-          </div>
-        `;
-
-      }).join('');
+          `;
+        }
+      ).join('');
 
 
     // --------------------------------------------------------
@@ -1312,6 +1634,7 @@
       );
 
     if (oldButton) {
+
       oldButton.remove();
     }
 
@@ -1319,17 +1642,21 @@
     if (
       Object.keys(progress).length === 0
     ) {
+
       return;
     }
 
 
     if (!$cardsGrid) {
+
       return;
     }
 
 
     const btn =
-      document.createElement('button');
+      document.createElement(
+        'button'
+      );
 
     btn.id =
       'btn-reset-my-prog';
@@ -1375,12 +1702,15 @@
       value === null ||
       value === undefined
     ) {
+
       return '';
     }
 
 
     const div =
-      document.createElement('div');
+      document.createElement(
+        'div'
+      );
 
     div.textContent =
       String(value);
