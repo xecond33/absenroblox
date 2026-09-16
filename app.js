@@ -1,509 +1,1401 @@
 // ============================================================
-// AbsensiMap — app.js (Apps Script Version)
+// AbsensiMap — app.js
+// Versi Manual — TANPA TIMER
 // ============================================================
 
 (async function () {
   'use strict';
 
-  // ---- State ----
+  // ==========================================================
+  // STATE
+  // ==========================================================
+
   let user = null;
   let items = [];
-  let progress = {}; 
+  let progress = {};
+  let progressDates = {};
+
   let currentFilter = 'all';
   let searchQuery = '';
-  
-  const activeTimers = {};
 
-  // ---- DOM Elements ----
+
+  // ==========================================================
+  // DOM ELEMENTS
+  // ==========================================================
+
   const $appContainer = document.getElementById('app-container');
   const $globalLoader = document.getElementById('global-loader');
+
   const $userNameDisplay = document.getElementById('user-name-display');
   const $userAvatarInitial = document.getElementById('user-avatar-initial');
+
   const $btnAdminLink = document.getElementById('btn-admin-link');
   const $btnLogout = document.getElementById('btn-logout');
+
   const $greetingTitle = document.getElementById('greeting-title');
   const $toastContainer = document.getElementById('toast-container');
-  
+
   const $cardsGrid = document.getElementById('cards-grid');
   const $emptyState = document.getElementById('empty-state');
+
   const $searchInput = document.getElementById('search-input');
   const $filterChips = document.getElementById('filter-chips');
-  
+
   const $statTotal = document.getElementById('stat-total');
   const $statRunning = document.getElementById('stat-running');
   const $statDone = document.getElementById('stat-done');
   const $statToday = document.getElementById('stat-today');
-  
-  const $todayPendingList = document.getElementById('today-pending-list');
-  const $todayCompletedList = document.getElementById('today-completed-list');
 
-  // ---- Initialize ----
+  const $todayPendingList =
+    document.getElementById('today-pending-list');
+
+  const $todayCompletedList =
+    document.getElementById('today-completed-list');
+
+
+  // ==========================================================
+  // INITIALIZE
+  // ==========================================================
+
   async function init() {
+
     try {
+
       user = await Auth.requireAuth();
+
       if (!user) return;
-      
+
       setupUI();
+
       await loadData();
+
       renderAll();
-      
+
       $appContainer.style.display = '';
       $globalLoader.classList.add('hidden');
+
       document.body.classList.add('loaded');
+
     } catch (err) {
+
       console.error('Init error:', err);
-      showToast('Gagal memuat data dari server.', 'error');
-      $globalLoader.innerHTML = '<div style="color:red; font-weight:bold;">Gagal terhubung ke Apps Script API.<br>Pastikan URL Apps Script sudah dimasukkan di auth.js.</div>';
+
+      showToast(
+        'Gagal memuat data dari server.',
+        'error'
+      );
+
+      $globalLoader.innerHTML = `
+        <div style="
+          color:red;
+          font-weight:bold;
+          text-align:center;
+        ">
+          Gagal terhubung ke Apps Script API.<br>
+          Pastikan URL Apps Script sudah benar di auth.js.
+        </div>
+      `;
     }
   }
 
+
+  // ==========================================================
+  // SETUP UI
+  // ==========================================================
+
   function setupUI() {
-    $userNameDisplay.textContent = user.username;
-    $userAvatarInitial.textContent = user.username.charAt(0).toUpperCase();
-    $greetingTitle.textContent = `Halo, ${user.username} 👋`;
-    
-    if (user.role === 'admin') {
+
+    if ($userNameDisplay) {
+      $userNameDisplay.textContent = user.username;
+    }
+
+    if ($userAvatarInitial) {
+      $userAvatarInitial.textContent =
+        user.username.charAt(0).toUpperCase();
+    }
+
+    if ($greetingTitle) {
+      $greetingTitle.textContent =
+        `Halo, ${user.username} 👋`;
+    }
+
+    // Tampilkan menu admin jika admin
+    if (
+      user.role === 'admin' &&
+      $btnAdminLink
+    ) {
       $btnAdminLink.style.display = 'inline-flex';
     }
 
-    $btnLogout.addEventListener('click', () => Auth.logout());
-    
-    $searchInput.addEventListener('input', e => {
-      searchQuery = e.target.value;
-      renderCards();
-    });
+    // Logout
+    if ($btnLogout) {
+      $btnLogout.addEventListener(
+        'click',
+        () => Auth.logout()
+      );
+    }
 
-    $filterChips.addEventListener('click', e => {
-      const chip = e.target.closest('.chip');
-      if (!chip) return;
-      currentFilter = chip.dataset.filter;
-      $filterChips.querySelectorAll('.chip').forEach(c => c.classList.remove('active'));
-      chip.classList.add('active');
-      renderCards();
-    });
+    // Search
+    if ($searchInput) {
 
-    $cardsGrid.addEventListener('click', handleCardClicks);
-  }
+      $searchInput.addEventListener(
+        'input',
+        function (e) {
 
-  // ---- Data Fetching ----
-  async function loadData() {
-    try {
-      const itemsData = await Auth.apiFetch('getItems');
-      items = itemsData.items || [];
-      
-      const progData = await Auth.apiFetch('getProgress');
-      progress = progData.progress || {};
-    } catch (e) {
-      showToast('Gagal memuat absensi', 'error');
+          searchQuery = e.target.value;
+
+          renderCards();
+
+        }
+      );
+    }
+
+    // Filter
+    if ($filterChips) {
+
+      $filterChips.addEventListener(
+        'click',
+        function (e) {
+
+          const chip =
+            e.target.closest('.chip');
+
+          if (!chip) return;
+
+          currentFilter =
+            chip.dataset.filter;
+
+          $filterChips
+            .querySelectorAll('.chip')
+            .forEach(function (c) {
+              c.classList.remove('active');
+            });
+
+          chip.classList.add('active');
+
+          renderCards();
+
+        }
+      );
+    }
+
+    // Klik Day / tombol reset
+    if ($cardsGrid) {
+
+      $cardsGrid.addEventListener(
+        'click',
+        handleCardClicks
+      );
     }
   }
 
-  // ---- Helpers ----
+
+  // ==========================================================
+  // LOAD DATA
+  // ==========================================================
+
+  async function loadData() {
+
+    try {
+
+      // Ambil daftar map/item
+      const itemsData =
+        await Auth.apiFetch('getItems');
+
+      items =
+        itemsData.items || [];
+
+
+      // Ambil progress user
+      const progData =
+        await Auth.apiFetch('getProgress');
+
+      progress =
+        progData.progress || {};
+
+      progressDates =
+        progData.progressDates || {};
+
+    } catch (e) {
+
+      console.error('Load data error:', e);
+
+      showToast(
+        'Gagal memuat data absensi.',
+        'error'
+      );
+
+      throw e;
+    }
+  }
+
+
+  // ==========================================================
+  // DATE
+  // ==========================================================
+
+  function getTodayDate() {
+
+    const now = new Date();
+
+    const year =
+      now.getFullYear();
+
+    const month =
+      String(now.getMonth() + 1)
+        .padStart(2, '0');
+
+    const day =
+      String(now.getDate())
+        .padStart(2, '0');
+
+    return `${year}-${month}-${day}`;
+  }
+
+
+  // ==========================================================
+  // PROGRESS HELPERS
+  // ==========================================================
+
   function getProgressForItem(itemId) {
+
     return progress[itemId] || [];
   }
 
+
   function getCompletedDaysCount(itemId) {
+
     return getProgressForItem(itemId).length;
   }
 
+
   function isDayCompleted(itemId, dayNumber) {
-    return getProgressForItem(itemId).includes(dayNumber);
-  }
-  
-  function getNextDay(item) {
-    const checkedDays = getProgressForItem(item.id);
-    for (let i = 1; i <= item.duration_days; i++) {
-      if (!checkedDays.includes(i)) return i;
-    }
-    return null; // All done
+
+    return getProgressForItem(itemId)
+      .includes(Number(dayNumber));
   }
 
+
+  function getDayDate(itemId, dayNumber) {
+
+    if (
+      !progressDates[itemId]
+    ) {
+      return null;
+    }
+
+    return (
+      progressDates[itemId][dayNumber] ||
+      progressDates[itemId][String(dayNumber)] ||
+      null
+    );
+  }
+
+
+  // ==========================================================
+  // STATUS
+  // ==========================================================
+
   function getStatus(item) {
-    const checked = getCompletedDaysCount(item.id);
-    if (checked === 0) return 'idle';
-    if (checked >= item.duration_days) return 'done';
+
+    const completed =
+      getCompletedDaysCount(item.id);
+
+    const duration =
+      Number(item.duration_days) || 0;
+
+    if (completed === 0) {
+      return 'idle';
+    }
+
+    if (completed >= duration) {
+      return 'done';
+    }
+
     return 'running';
   }
 
+
   function getStatusLabel(status) {
-    if (status === 'idle') return 'Belum Mulai';
-    if (status === 'running') return 'Sedang Berjalan';
+
+    if (status === 'idle') {
+      return 'Belum Mulai';
+    }
+
+    if (status === 'running') {
+      return 'Sedang Berjalan';
+    }
+
     return 'Selesai';
   }
 
+
   function calculatePct(item) {
-    return Math.round((getCompletedDaysCount(item.id) / item.duration_days) * 100);
-  }
-  
-  function formatTime(totalSeconds) {
-    const m = Math.floor(totalSeconds / 60).toString().padStart(2, '0');
-    const s = (totalSeconds % 60).toString().padStart(2, '0');
-    return `${m}:${s}`;
+
+    const duration =
+      Number(item.duration_days) || 0;
+
+    if (duration <= 0) {
+      return 0;
+    }
+
+    const completed =
+      getCompletedDaysCount(item.id);
+
+    return Math.min(
+      100,
+      Math.round(
+        (completed / duration) * 100
+      )
+    );
   }
 
-  function showToast(message, type = 'info') {
-    const toast = document.createElement('div');
-    toast.className = `toast toast-${type}`;
+
+  // ==========================================================
+  // ABSENSI HARI INI
+  // ==========================================================
+
+  function getTodayAttendance(item) {
+
+    const today =
+      getTodayDate();
+
+    const dates =
+      progressDates[item.id] || {};
+
+    const completedDays =
+      getProgressForItem(item.id);
+
+    for (
+      let i = 0;
+      i < completedDays.length;
+      i++
+    ) {
+
+      const dayNumber =
+        Number(completedDays[i]);
+
+      const attendanceDate =
+        dates[dayNumber] ||
+        dates[String(dayNumber)];
+
+      if (
+        attendanceDate &&
+        String(attendanceDate).substring(0, 10) === today
+      ) {
+
+        return dayNumber;
+      }
+    }
+
+    return null;
+  }
+
+
+  // ==========================================================
+  // TOAST
+  // ==========================================================
+
+  function showToast(
+    message,
+    type = 'info'
+  ) {
+
+    if (!$toastContainer) return;
+
+    const toast =
+      document.createElement('div');
+
+    toast.className =
+      `toast toast-${type}`;
+
+    const icon =
+      type === 'success'
+        ? '✓'
+        : type === 'error'
+          ? '⚠'
+          : 'ℹ';
+
     toast.innerHTML = `
-      ${type === 'success' ? '✓' : type === 'error' ? '⚠' : 'ℹ'}
-      <span>${message}</span>
+      ${icon}
+      <span>${escHtml(message)}</span>
     `;
+
     $toastContainer.appendChild(toast);
-    
-    setTimeout(() => {
-      toast.style.animation = 'toastOut 0.4s var(--ease) forwards';
-      setTimeout(() => toast.remove(), 400);
+
+    setTimeout(function () {
+
+      toast.style.animation =
+        'toastOut 0.4s var(--ease) forwards';
+
+      setTimeout(function () {
+        toast.remove();
+      }, 400);
+
     }, 3000);
   }
 
-  // ---- Actions ----
-  async function toggleDayCompletion(itemId, dayNumber, isCurrentlyCompleted) {
-    const cell = document.querySelector(`.day-cell[data-item-id="${itemId}"][data-day="${dayNumber}"]`);
-    const wasCompleted = isCurrentlyCompleted;
-    const targetCompleted = !wasCompleted;
-    
-    // Optimistic
-    if (cell) cell.classList.toggle('checked');
-    
-    if (!progress[itemId]) progress[itemId] = [];
-    if (targetCompleted && !progress[itemId].includes(dayNumber)) progress[itemId].push(dayNumber);
-    if (!targetCompleted) progress[itemId] = progress[itemId].filter(d => d !== dayNumber);
-    renderCards();
-    renderStats();
-    renderToday();
-    
+
+  // ==========================================================
+  // DAY CLICK
+  // ==========================================================
+
+  async function toggleDayCompletion(
+    itemId,
+    dayNumber,
+    isCurrentlyCompleted
+  ) {
+
+    const targetCompleted =
+      !isCurrentlyCompleted;
+
+
+    // --------------------------------------------------------
+    // Optimistic update
+    // --------------------------------------------------------
+
+    if (!progress[itemId]) {
+      progress[itemId] = [];
+    }
+
+
+    if (targetCompleted) {
+
+      // Tambahkan Day
+      if (
+        !progress[itemId]
+          .includes(Number(dayNumber))
+      ) {
+
+        progress[itemId].push(
+          Number(dayNumber)
+        );
+      }
+
+      // Simpan tanggal lokal sementara
+      if (!progressDates[itemId]) {
+        progressDates[itemId] = {};
+      }
+
+      progressDates[itemId][dayNumber] =
+        getTodayDate();
+
+    } else {
+
+      // Hapus Day
+      progress[itemId] =
+        progress[itemId].filter(
+          d =>
+            Number(d) !==
+            Number(dayNumber)
+        );
+
+      // Hapus tanggalnya
+      if (progressDates[itemId]) {
+
+        delete progressDates[itemId][dayNumber];
+
+        delete progressDates[itemId][String(dayNumber)];
+      }
+    }
+
+
+    renderAll();
+
+
+    // --------------------------------------------------------
+    // Kirim ke Apps Script
+    // --------------------------------------------------------
+
     try {
-      await Auth.apiFetch('updateProgress', { itemId, dayNumber, completed: targetCompleted });
+
+      const result =
+        await Auth.apiFetch(
+          'updateProgress',
+          {
+            itemId: itemId,
+            dayNumber: Number(dayNumber),
+            completed: targetCompleted,
+            date: getTodayDate()
+          }
+        );
+
+
+      if (
+        result &&
+        result.message
+      ) {
+
+        if (targetCompleted) {
+
+          showToast(
+            `Day ${dayNumber} berhasil dicatat sebagai absensi hari ini.`,
+            'success'
+          );
+
+        } else {
+
+          showToast(
+            `Absensi Day ${dayNumber} dibatalkan.`,
+            'info'
+          );
+        }
+      }
+
+
+      // Ambil ulang dari server supaya data
+      // benar-benar sinkron
+      await loadData();
+
+      renderAll();
+
+
     } catch (err) {
-      showToast('Gagal sinkronisasi dengan server.', 'error');
+
+      console.error(
+        'Update progress error:',
+        err
+      );
+
+
+      // Jika gagal, reload data server
+      try {
+
+        await loadData();
+
+      } catch (reloadError) {
+
+        console.error(
+          'Reload error:',
+          reloadError
+        );
+      }
+
+      renderAll();
+
+      showToast(
+        'Gagal menyimpan absensi ke server.',
+        'error'
+      );
     }
   }
 
-  // ---- Timer Logic ----
+
+  // ==========================================================
+  // CARD CLICK HANDLER
+  // ==========================================================
+
   function handleCardClicks(e) {
-    const dayCell = e.target.closest('.day-cell');
+
+    // --------------------------------------------------------
+    // Klik Day
+    // --------------------------------------------------------
+
+    const dayCell =
+      e.target.closest('.day-cell');
+
     if (dayCell) {
-      const itemId = dayCell.dataset.itemId;
-      const dayNum = parseInt(dayCell.dataset.day);
-      const isCompleted = dayCell.classList.contains('checked');
-      toggleDayCompletion(itemId, dayNum, isCompleted);
+
+      const itemId =
+        dayCell.dataset.itemId;
+
+      const dayNumber =
+        parseInt(
+          dayCell.dataset.day,
+          10
+        );
+
+      const isCompleted =
+        dayCell.classList.contains(
+          'checked'
+        );
+
+
+      toggleDayCompletion(
+        itemId,
+        dayNumber,
+        isCompleted
+      );
+
       return;
     }
 
-    const timerBtn = e.target.closest('.timer-btn');
-    if (timerBtn) {
-      const itemId = timerBtn.dataset.itemId;
-      const action = timerBtn.dataset.action;
-      const item = items.find(i => i.id === itemId);
-      
-      if (!item) return;
 
-      if (action === 'start') startTimer(item);
-      else if (action === 'pause') pauseTimer(item);
-      else if (action === 'reset') resetTimer(item); // Using reset instead of done
-      else if (action === 'done') markTimerDone(item);
-    }
-    
-    const resetProgBtn = e.target.closest('.btn-reset-prog');
-    if (resetProgBtn) {
-       resetMyProgress();
-    }
-  }
-  
-  function resetMyProgress() {
-    if(confirm('Yakin ingin mereset seluruh progress milikmu? Semua akan kembali dari awal.')) {
-      Auth.apiFetch('resetProgress').then(() => {
-        showToast('Progress berhasil direset', 'success');
-        progress = {};
-        renderAll();
-      }).catch(err => {
-        showToast('Gagal reset progress', 'error');
-      });
-    }
-  }
-  
-  function updateTimerUI(item) {
-    const timerState = activeTimers[item.id];
-    const timeDisplay = document.getElementById(`timer-time-${item.id}`);
-    const btnStart = document.getElementById(`timer-btn-start-${item.id}`);
-    const btnPause = document.getElementById(`timer-btn-pause-${item.id}`);
-    const btnReset = document.getElementById(`timer-btn-reset-${item.id}`);
-    const reachedMsg = document.getElementById(`timer-reached-${item.id}`);
-    
-    if (!timeDisplay) return;
+    // --------------------------------------------------------
+    // Reset progress
+    // --------------------------------------------------------
 
-    const targetSeconds = item.required_minutes * 60;
-    const currentSeconds = timerState ? timerState.secondsPassed : 0;
-    const isRunning = timerState && timerState.state === 'running';
-    const hasReachedTarget = currentSeconds >= targetSeconds;
+    const resetBtn =
+      e.target.closest(
+        '.btn-reset-prog'
+      );
 
-    timeDisplay.textContent = formatTime(currentSeconds);
+    if (resetBtn) {
 
-    if (isRunning) {
-      btnStart.style.display = 'none';
-      btnPause.style.display = 'flex';
-      btnReset.style.display = 'flex';
-    } else {
-      btnStart.style.display = 'flex';
-      btnPause.style.display = 'none';
-      btnReset.style.display = currentSeconds > 0 ? 'flex' : 'none'; 
-    }
+      resetMyProgress();
 
-    if (hasReachedTarget) {
-      btnStart.disabled = true;
-      reachedMsg.classList.remove('hidden');
-    } else {
-      btnStart.disabled = false;
-      reachedMsg.classList.add('hidden');
+      return;
     }
   }
 
-  function startTimer(item) {
-    if (!activeTimers[item.id]) {
-      activeTimers[item.id] = { secondsPassed: 0, state: 'running' };
+
+  // ==========================================================
+  // RESET PROGRESS
+  // ==========================================================
+
+  async function resetMyProgress() {
+
+    const confirmed =
+      confirm(
+        'Yakin ingin mereset seluruh progress milikmu?\n\n' +
+        'Semua Day yang sudah dicentang akan dihapus.'
+      );
+
+    if (!confirmed) {
+      return;
     }
-    
-    const state = activeTimers[item.id];
-    if (state.state === 'running' && state.intervalId) return;
-    
-    state.state = 'running';
-    state.intervalId = setInterval(() => {
-      state.secondsPassed++;
-      updateTimerUI(item);
-    }, 1000);
-    
-    updateTimerUI(item);
-  }
 
-  function pauseTimer(item) {
-    const state = activeTimers[item.id];
-    if (!state) return;
-    clearInterval(state.intervalId);
-    state.intervalId = null;
-    state.state = 'paused';
-    updateTimerUI(item);
-  }
-  
-  function resetTimer(item) {
-    const state = activeTimers[item.id];
-    if (!state) return;
-    clearInterval(state.intervalId);
-    delete activeTimers[item.id];
-    updateTimerUI(item);
-  }
 
-  // ---- Filtering ----
-  function filteredData() {
-    let result = items;
-    if (searchQuery.trim()) {
-      const q = searchQuery.toLowerCase();
-      result = result.filter(d => 
-        d.name.toLowerCase().includes(q) || 
-        d.map_name.toLowerCase().includes(q)
+    try {
+
+      await Auth.apiFetch(
+        'resetProgress'
+      );
+
+      progress = {};
+      progressDates = {};
+
+      renderAll();
+
+      showToast(
+        'Semua progress berhasil direset.',
+        'success'
+      );
+
+    } catch (err) {
+
+      console.error(
+        'Reset progress error:',
+        err
+      );
+
+      showToast(
+        'Gagal mereset progress.',
+        'error'
       );
     }
-    if (currentFilter === '7') result = result.filter(d => parseInt(d.duration_days) === 7);
-    else if (currentFilter === '14') result = result.filter(d => parseInt(d.duration_days) === 14);
-    else if (currentFilter === '30') result = result.filter(d => parseInt(d.duration_days) === 30);
-    else if (currentFilter === 'running') result = result.filter(d => getStatus(d) === 'running');
-    else if (currentFilter === 'done') result = result.filter(d => getStatus(d) === 'done');
+  }
+
+
+  // ==========================================================
+  // FILTERING
+  // ==========================================================
+
+  function filteredData() {
+
+    let result =
+      items.slice();
+
+
+    // Search
+    if (
+      searchQuery.trim()
+    ) {
+
+      const q =
+        searchQuery
+          .toLowerCase()
+          .trim();
+
+      result =
+        result.filter(function (item) {
+
+          return (
+            String(item.name || '')
+              .toLowerCase()
+              .includes(q)
+
+            ||
+
+            String(item.map_name || '')
+              .toLowerCase()
+              .includes(q)
+          );
+        });
+    }
+
+
+    // Filter duration
+    if (currentFilter === '7') {
+
+      result =
+        result.filter(
+          item =>
+            Number(item.duration_days) === 7
+        );
+
+    } else if (currentFilter === '14') {
+
+      result =
+        result.filter(
+          item =>
+            Number(item.duration_days) === 14
+        );
+
+    } else if (currentFilter === '30') {
+
+      result =
+        result.filter(
+          item =>
+            Number(item.duration_days) === 30
+        );
+
+    } else if (
+      currentFilter === 'running'
+    ) {
+
+      result =
+        result.filter(
+          item =>
+            getStatus(item) === 'running'
+        );
+
+    } else if (
+      currentFilter === 'done'
+    ) {
+
+      result =
+        result.filter(
+          item =>
+            getStatus(item) === 'done'
+        );
+    }
+
+
     return result;
   }
 
-  // ---- Renderers ----
+
+  // ==========================================================
+  // STATISTICS
+  // ==========================================================
+
   function renderStats() {
-    const total = items.length;
-    let running = 0, done = 0;
-    
-    items.forEach(item => {
-      const s = getStatus(item);
-      if (s === 'running') running++;
-      if (s === 'done') done++;
+
+    const total =
+      items.length;
+
+    let running = 0;
+    let done = 0;
+
+    items.forEach(function (item) {
+
+      const status =
+        getStatus(item);
+
+      if (status === 'running') {
+        running++;
+      }
+
+      if (status === 'done') {
+        done++;
+      }
     });
-    
-    $statTotal.textContent = total;
-    $statRunning.textContent = running;
-    $statDone.textContent = done;
+
+
+    if ($statTotal) {
+      $statTotal.textContent =
+        total;
+    }
+
+    if ($statRunning) {
+      $statRunning.textContent =
+        running;
+    }
+
+    if ($statDone) {
+      $statDone.textContent =
+        done;
+    }
   }
 
+
+  // ==========================================================
+  // RENDER ABSENSI HARI INI
+  // ==========================================================
+
   function renderToday() {
+
     let pendingHTML = '';
     let completedHTML = '';
+
     let pendingCount = 0;
     let completedCount = 0;
 
-    items.forEach(item => {
-      const nextDay = getNextDay(item);
 
-      if (nextDay !== null) {
-        pendingCount++;
-        pendingHTML += `
-          <div class="today-item">
-            <div class="today-item-name">
-              <div class="dot red"></div>
-              ${escHtml(item.name)}
-            </div>
-            <div class="today-item-info">
-              <span>📍 ${escHtml(item.map_name)}</span>
-              <span>⏱️ Wajib stay ${item.required_minutes} menit</span>
-              <span>📅 Day ${nextDay}/${item.duration_days}</span>
-            </div>
-          </div>
-        `;
-      } else {
+    items.forEach(function (item) {
+
+      const todayDay =
+        getTodayAttendance(item);
+
+
+      // ------------------------------------------------------
+      // SUDAH ABSEN HARI INI
+      // ------------------------------------------------------
+
+      if (todayDay !== null) {
+
         completedCount++;
+
         completedHTML += `
           <div class="today-item">
+
             <div class="today-item-name">
+
               <div class="dot green"></div>
+
               ${escHtml(item.name)}
+
             </div>
+
             <div class="today-item-info">
-              <span>✓ Selesai ${item.duration_days}/${item.duration_days} hari</span>
+
+              <span>
+                ✓ Sudah Absen Hari Ini
+              </span>
+
+              <span>
+                📅 Day ${todayDay}/${item.duration_days}
+              </span>
+
+              <span>
+                📍 ${escHtml(item.map_name || '-')}
+              </span>
+
             </div>
+
+          </div>
+        `;
+
+      }
+
+      // ------------------------------------------------------
+      // BELUM ABSEN HARI INI
+      // ------------------------------------------------------
+
+      else {
+
+        pendingCount++;
+
+        pendingHTML += `
+          <div class="today-item">
+
+            <div class="today-item-name">
+
+              <div class="dot red"></div>
+
+              ${escHtml(item.name)}
+
+            </div>
+
+            <div class="today-item-info">
+
+              <span>
+                ⚠ Belum Absen Hari Ini
+              </span>
+
+              <span>
+                📍 ${escHtml(item.map_name || '-')}
+              </span>
+
+              <span>
+                ⏱️ Wajib stay ${item.required_minutes || 0} menit
+              </span>
+
+            </div>
+
           </div>
         `;
       }
+
     });
 
-    if (pendingCount === 0) pendingHTML = `<div class="today-empty">Hebat! Semua absensi hari ini sudah selesai.</div>`;
-    if (completedCount === 0) completedHTML = `<div class="today-empty">Belum ada absensi yang diselesaikan hari ini.</div>`;
 
-    $todayPendingList.innerHTML = pendingHTML;
-    $todayCompletedList.innerHTML = completedHTML;
-    
-    $statToday.textContent = `${completedCount}/${completedCount + pendingCount}`;
+    // --------------------------------------------------------
+    // EMPTY STATE
+    // --------------------------------------------------------
+
+    if (pendingCount === 0) {
+
+      pendingHTML = `
+        <div class="today-empty">
+          Semua absensi hari ini sudah selesai ✓
+        </div>
+      `;
+    }
+
+
+    if (completedCount === 0) {
+
+      completedHTML = `
+        <div class="today-empty">
+          Belum ada absensi yang diselesaikan hari ini.
+        </div>
+      `;
+    }
+
+
+    if ($todayPendingList) {
+
+      $todayPendingList.innerHTML =
+        pendingHTML;
+    }
+
+
+    if ($todayCompletedList) {
+
+      $todayCompletedList.innerHTML =
+        completedHTML;
+    }
+
+
+    // Statistik hari ini
+    if ($statToday) {
+
+      $statToday.textContent =
+        `${completedCount}/${items.length}`;
+    }
   }
+
+
+  // ==========================================================
+  // RENDER CARDS
+  // ==========================================================
 
   function renderCards() {
-    const list = filteredData();
 
+    const list =
+      filteredData();
+
+
+    // Empty
     if (!list.length) {
-      $cardsGrid.style.display = 'none';
-      $emptyState.style.display = '';
+
+      if ($cardsGrid) {
+        $cardsGrid.style.display = 'none';
+      }
+
+      if ($emptyState) {
+        $emptyState.style.display = '';
+      }
+
       return;
     }
-    
-    $cardsGrid.style.display = '';
-    $emptyState.style.display = 'none';
 
-    $cardsGrid.innerHTML = list.map((item, idx) => {
-      const status = getStatus(item);
-      const statusLabel = getStatusLabel(status);
-      const percent = calculatePct(item);
-      const checkedCount = getCompletedDaysCount(item.id);
-      const nextDay = getNextDay(item);
-      
-      let daysCells = '';
-      for (let i = 1; i <= item.duration_days; i++) {
-        const isChecked = isDayCompleted(item.id, i);
-        const cls = isChecked ? 'day-cell checked' : 'day-cell';
-        daysCells += `<div class="${cls}" data-item-id="${item.id}" data-day="${i}" title="Day ${i}">
-          ${isChecked ? '✓' : ''} ${i}
-        </div>`;
-      }
-      
-      const tState = activeTimers[item.id] || { secondsPassed: 0, state: 'paused' };
-      const displayTime = formatTime(tState.secondsPassed);
-      const isRunning = tState.state === 'running';
-      const hasReached = tState.secondsPassed >= (item.required_minutes * 60);
 
-      return `
-        <div class="card" style="animation-delay:${idx * 0.05}s" data-card-id="${item.id}">
-          <div class="card-header">
-            <div class="card-title-group">
-              <span class="card-name">${escHtml(item.name)}</span>
-              <span class="card-duration-badge">${item.duration_days} Hari</span>
-            </div>
-          </div>
-          
-          <div class="card-map-info">
-            <div class="card-map-info-row">
-              <span class="info-icon">📍</span>
-              <span class="info-label">Map:</span>
-              <span class="info-value">${escHtml(item.map_name) || '-'}</span>
-            </div>
-            <div class="card-map-info-row">
-              <span class="info-icon">⏱️</span>
-              <span class="info-label">Stay wajib:</span>
-              <span class="info-value">${item.required_minutes} Menit</span>
-            </div>
-          </div>
+    if ($cardsGrid) {
 
-          <div class="card-progress">
-            <div class="progress-info">
-              <span class="progress-text">Progress ${checkedCount}/${item.duration_days}</span>
-              <span class="progress-pct">${percent}%</span>
+      $cardsGrid.style.display = '';
+    }
+
+    if ($emptyState) {
+
+      $emptyState.style.display = 'none';
+    }
+
+
+    $cardsGrid.innerHTML =
+      list.map(function (item, idx) {
+
+        const status =
+          getStatus(item);
+
+        const statusLabel =
+          getStatusLabel(status);
+
+        const percent =
+          calculatePct(item);
+
+        const checkedCount =
+          getCompletedDaysCount(item.id);
+
+        const todayDay =
+          getTodayAttendance(item);
+
+
+        // ------------------------------------------------------
+        // DAYS
+        // ------------------------------------------------------
+
+        let daysCells = '';
+
+        const duration =
+          Number(item.duration_days) || 0;
+
+
+        for (
+          let i = 1;
+          i <= duration;
+          i++
+        ) {
+
+          const isChecked =
+            isDayCompleted(
+              item.id,
+              i
+            );
+
+          const isTodayAttendance =
+            todayDay === i;
+
+
+          let cls =
+            'day-cell';
+
+
+          if (isChecked) {
+            cls += ' checked';
+          }
+
+
+          if (isTodayAttendance) {
+            cls += ' today-attendance';
+          }
+
+
+          daysCells += `
+            <div
+              class="${cls}"
+              data-item-id="${escHtml(item.id)}"
+              data-day="${i}"
+              title="Klik untuk ${
+                isChecked
+                  ? 'membatalkan'
+                  : 'mencatat'
+              } absensi Day ${i}"
+            >
+              ${
+                isChecked
+                  ? '✓'
+                  : ''
+              }
+              ${i}
             </div>
-            <div class="progress-bar">
-              <div class="progress-fill ${status === 'done' ? 'complete' : ''}" style="width:${percent}%"></div>
+          `;
+        }
+
+
+        // ------------------------------------------------------
+        // TODAY STATUS
+        // ------------------------------------------------------
+
+        let todayStatusHTML = '';
+
+        if (todayDay !== null) {
+
+          todayStatusHTML = `
+            <div style="
+              margin-top:10px;
+              padding:10px 12px;
+              border-radius:10px;
+              background:rgba(34,197,94,.10);
+              color:#16a34a;
+              font-size:.82rem;
+              font-weight:700;
+            ">
+              ✓ Sudah Absen Hari Ini — Day ${todayDay}
             </div>
-            <div style="font-size: 0.8rem; margin-top:8px; font-weight:600; color:var(--text-muted)">
-              ${nextDay ? `Next: Day ${nextDay}` : `✓ SELESAI`}
+          `;
+
+        } else {
+
+          todayStatusHTML = `
+            <div style="
+              margin-top:10px;
+              padding:10px 12px;
+              border-radius:10px;
+              background:rgba(239,68,68,.08);
+              color:#dc2626;
+              font-size:.82rem;
+              font-weight:700;
+            ">
+              ⚠ Belum Absen Hari Ini
             </div>
-          </div>
-          
-          <div class="card-days">
-            <div class="card-days-grid">
-              ${daysCells}
-            </div>
-          </div>
-          
-          <div class="card-timer">
-            <div class="timer-header">Stay Timer</div>
-            <div class="timer-display">
-              <div class="timer-time">
-                <span id="timer-time-${item.id}">${displayTime}</span>
-                <span class="timer-separator">/</span>
-                <span class="timer-target">${formatTime(item.required_minutes * 60)}</span>
+          `;
+        }
+
+
+        // ------------------------------------------------------
+        // CARD
+        // ------------------------------------------------------
+
+        return `
+          <div
+            class="card"
+            style="animation-delay:${idx * 0.05}s"
+            data-card-id="${escHtml(item.id)}"
+          >
+
+            <!-- HEADER -->
+
+            <div class="card-header">
+
+              <div class="card-title-group">
+
+                <span class="card-name">
+                  ${escHtml(item.name)}
+                </span>
+
+                <span class="card-duration-badge">
+                  ${duration} Hari
+                </span>
+
               </div>
-              <div class="timer-controls">
-                <button class="timer-btn timer-btn-start" id="timer-btn-start-${item.id}" data-item-id="${item.id}" data-action="start" style="display: ${isRunning ? 'none' : 'flex'}" title="Mulai Stay">
-                  ▶ Mulai
-                </button>
-                <button class="timer-btn" id="timer-btn-pause-${item.id}" data-item-id="${item.id}" data-action="pause" style="display: ${isRunning ? 'flex' : 'none'}" title="Pause">
-                  ⏸ Pause
-                </button>
-                <button class="timer-btn" id="timer-btn-reset-${item.id}" data-item-id="${item.id}" data-action="reset" style="display: ${tState.secondsPassed > 0 && !isRunning ? 'flex' : 'none'}" title="Reset Timer">
-                  ↻ Reset
-                </button>
+
+            </div>
+
+
+            <!-- MAP INFO -->
+
+            <div class="card-map-info">
+
+              <div class="card-map-info-row">
+
+                <span class="info-icon">
+                  📍
+                </span>
+
+                <span class="info-label">
+                  Map:
+                </span>
+
+                <span class="info-value">
+                  ${escHtml(item.map_name || '-')}
+                </span>
+
               </div>
+
+
+              <div class="card-map-info-row">
+
+                <span class="info-icon">
+                  ⏱️
+                </span>
+
+                <span class="info-label">
+                  Stay wajib:
+                </span>
+
+                <span class="info-value">
+                  ${item.required_minutes || 0} Menit
+                </span>
+
+              </div>
+
             </div>
-            <div class="timer-reached ${hasReached ? '' : 'hidden'}" id="timer-reached-${item.id}">
-              ✓ Durasi minimum tercapai
+
+
+            <!-- PROGRESS -->
+
+            <div class="card-progress">
+
+              <div class="progress-info">
+
+                <span class="progress-text">
+                  Progress
+                  ${checkedCount}/${duration}
+                </span>
+
+                <span class="progress-pct">
+                  ${percent}%
+                </span>
+
+              </div>
+
+
+              <div class="progress-bar">
+
+                <div
+                  class="progress-fill ${
+                    status === 'done'
+                      ? 'complete'
+                      : ''
+                  }"
+                  style="width:${percent}%"
+                ></div>
+
+              </div>
+
+
+              <div style="
+                font-size:.8rem;
+                margin-top:8px;
+                font-weight:600;
+                color:var(--text-muted);
+              ">
+
+                Status:
+                ${escHtml(statusLabel)}
+
+              </div>
+
+              ${todayStatusHTML}
+
             </div>
-            <div style="font-size:0.65rem; color:var(--text-muted); margin-top:8px;">Timer hanya menghitung waktu di website dan tidak dapat membuktikan kehadiran riil di map.</div>
+
+
+            <!-- DAYS -->
+
+            <div class="card-days">
+
+              <div class="card-days-grid">
+
+                ${daysCells}
+
+              </div>
+
+            </div>
+
+
+            <!-- MANUAL INFO -->
+
+            <div style="
+              margin-top:14px;
+              padding:12px;
+              border-radius:10px;
+              background:var(--bg-secondary, #f5f5f5);
+              font-size:.75rem;
+              color:var(--text-muted);
+              line-height:1.5;
+            ">
+
+              <strong>
+                📌 Absensi Manual
+              </strong>
+
+              <br>
+
+              Klik Day yang sudah kamu lakukan.
+              Setelah diklik, absensi langsung dicatat.
+
+              <br><br>
+
+              📍 Map dan ⏱️ waktu stay hanya
+              sebagai informasi. Website tidak
+              menjalankan atau memverifikasi timer.
+
+            </div>
+
           </div>
-        </div>`;
-    }).join('');
+        `;
+
+      }).join('');
+
+
+    // --------------------------------------------------------
+    // RESET BUTTON
+    // --------------------------------------------------------
+
+    renderResetButton();
   }
+
+
+  // ==========================================================
+  // RESET BUTTON
+  // ==========================================================
+
+  function renderResetButton() {
+
+    const oldButton =
+      document.getElementById(
+        'btn-reset-my-prog'
+      );
+
+    if (oldButton) {
+      oldButton.remove();
+    }
+
+
+    if (
+      Object.keys(progress).length === 0
+    ) {
+      return;
+    }
+
+
+    if (!$cardsGrid) {
+      return;
+    }
+
+
+    const btn =
+      document.createElement('button');
+
+    btn.id =
+      'btn-reset-my-prog';
+
+    btn.className =
+      'btn btn-ghost btn-reset-prog';
+
+    btn.style =
+      'margin:20px auto; display:block; color:var(--danger);';
+
+    btn.innerText =
+      'Reset Semua Progress Milikku';
+
+
+    $cardsGrid.parentNode.insertBefore(
+      btn,
+      $cardsGrid.nextSibling
+    );
+  }
+
+
+  // ==========================================================
+  // RENDER ALL
+  // ==========================================================
 
   function renderAll() {
+
     renderStats();
+
     renderToday();
+
     renderCards();
-    
-    // Inject reset all progress button
-    if(Object.keys(progress).length > 0) {
-      if(!document.getElementById('btn-reset-my-prog')){
-        const btn = document.createElement('button');
-        btn.id = 'btn-reset-my-prog';
-        btn.className = 'btn btn-ghost btn-reset-prog';
-        btn.style = 'margin: 20px auto; display:block; color:var(--danger);';
-        btn.innerText = 'Reset Semua Progress Milikku';
-        $cardsGrid.parentNode.insertBefore(btn, $cardsGrid.nextSibling);
-      }
-    }
   }
 
-  function escHtml(str) {
-    if (!str) return '';
-    const div = document.createElement('div');
-    div.textContent = str;
+
+  // ==========================================================
+  // ESCAPE HTML
+  // ==========================================================
+
+  function escHtml(value) {
+
+    if (
+      value === null ||
+      value === undefined
+    ) {
+      return '';
+    }
+
+
+    const div =
+      document.createElement('div');
+
+    div.textContent =
+      String(value);
+
     return div.innerHTML;
   }
 
-  document.addEventListener('DOMContentLoaded', init);
+
+  // ==========================================================
+  // START
+  // ==========================================================
+
+  document.addEventListener(
+    'DOMContentLoaded',
+    init
+  );
 
 })();
