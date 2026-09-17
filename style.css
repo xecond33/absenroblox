@@ -863,7 +863,7 @@ body::before {
   border-color: var(--accent-light);
 }
 
-.day-cell.today {
+.day-cell.last-checked {
   box-shadow: 0 0 0 2px var(--warning) inset;
 }
 
@@ -1046,6 +1046,103 @@ body::before {
 .duration-options {
   display: flex;
   gap: var(--space-sm);
+}
+
+.reset-mode-options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-sm);
+}
+
+.reset-mode-btn {
+  padding: 7px 12px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  background: var(--bg-input);
+  color: var(--text-secondary);
+  font-size: 0.78rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all var(--duration) var(--ease);
+}
+
+.reset-mode-btn:hover {
+  border-color: var(--accent-light);
+}
+
+.reset-mode-btn.active {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+
+.reset-hour-row {
+  margin-top: var(--space-sm);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.reset-hour-row input[type="number"] {
+  width: 100px;
+  padding: var(--space-sm) var(--space-md);
+  background: var(--bg-input);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text-primary);
+  font-family: var(--font);
+  font-size: 0.9rem;
+  outline: none;
+}
+
+.reset-hour-row input[type="number"]:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-dim);
+}
+
+.claim-detail {
+  font-size: 0.72rem;
+  color: var(--text-muted);
+}
+
+.card-claim-row {
+  padding: 0 var(--space-lg) var(--space-md);
+}
+
+.btn-claim {
+  width: 100%;
+  padding: 9px 14px;
+  border-radius: var(--radius-sm);
+  border: none;
+  background: var(--accent);
+  color: #fff;
+  font-size: 0.82rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all var(--duration) var(--ease);
+}
+
+.btn-claim:hover:not(:disabled) {
+  background: var(--accent-light);
+  transform: translateY(-1px);
+}
+
+.btn-claim:disabled {
+  background: var(--bg-elevated);
+  color: var(--text-muted);
+  cursor: not-allowed;
+}
+
+.btn-claim-lg {
+  margin-bottom: var(--space-md);
+  font-size: 0.9rem;
+  padding: 12px 16px;
+}
+
+.days-reset-mode {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  margin-bottom: var(--space-sm);
 }
 
 .duration-btn {
