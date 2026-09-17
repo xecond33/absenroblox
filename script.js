@@ -25,6 +25,8 @@
   let searchQuery = '';
   let editingId = null; // null = add mode, id = edit mode
   let selectedDuration = 30;
+  let selectedResetMode = 'fixed'; // 'fixed' | 'rolling'
+  let selectedResetHour = 0; // dipakai kalau resetMode === 'fixed'
   let dayModalItemId = null;
 
   // ---- Sync state ----
@@ -68,6 +70,9 @@
   const $inputName = document.getElementById('input-name');
   const $inputNote = document.getElementById('input-note');
   const $durationOptions = document.getElementById('duration-options');
+  const $resetModeOptions = document.getElementById('reset-mode-options');
+  const $resetHourRow = document.getElementById('reset-hour-row');
+  const $inputResetHour = document.getElementById('input-reset-hour');
   const $modalFormSave = document.getElementById('modal-form-save');
 
   // Modal: Confirm
@@ -80,19 +85,32 @@
   const $modalDays = document.getElementById('modal-days');
   const $modalDaysTitle = document.getElementById('modal-days-title');
   const $modalDaysNote = document.getElementById('modal-days-note');
+  const $modalDaysResetMode = document.getElementById('modal-days-reset-mode');
   const $modalDaysTodayBadge = document.getElementById('modal-days-today-badge');
+  const $modalDaysClaimDetail = document.getElementById('modal-days-claim-detail');
+  const $modalDaysClaimBtn = document.getElementById('modal-days-claim-btn');
   const $daysGrid = document.getElementById('days-grid');
   const $daysProgressText = document.getElementById('modal-days-progress-text');
   const $daysProgressPct = document.getElementById('modal-days-progress-pct');
   const $daysProgressFill = document.getElementById('modal-days-progress-fill');
 
-  // ---- Date helpers (buat badge sudah/belum absen hari ini) ----
+  // ---- Date & reset-mode helpers ----
+  function pad2(n) { return String(n).padStart(2, '0'); }
+
+  function dateStrFromDate(d) {
+    return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
+  }
+
+  // "Tanggal logis" hari ini, digeser sesuai jam reset (mis. resetHour=20 -> hari
+  // baru dianggap mulai jam 20:00, bukan jam 00:00). Catatan: pakai jam lokal
+  // device, jadi asumsinya device kamu sudah di zona WIB.
+  function logicalDateStr(resetHour) {
+    const d = new Date(Date.now() - (resetHour || 0) * 3600000);
+    return dateStrFromDate(d);
+  }
+
   function todayStr() {
-    const d = new Date();
-    const y = d.getFullYear();
-    const m = String(d.getMonth() + 1).padStart(2, '0');
-    const day = String(d.getDate()).padStart(2, '0');
-    return `${y}-${m}-${day}`;
+    return logicalDateStr(0);
   }
 
   function daysBetween(startStr, endStr) {
@@ -101,18 +119,71 @@
     return Math.round((end - start) / 86400000);
   }
 
-  function getTodayIndex(item) {
-    if (!item.startDate) return -1;
-    return daysBetween(item.startDate, todayStr());
+  function formatDuration(ms) {
+    const totalMin = Math.max(0, Math.ceil(ms / 60000));
+    const h = Math.floor(totalMin / 60);
+    const m = totalMin % 60;
+    if (h > 0) return `${h}j ${m}m`;
+    return `${m}m`;
   }
 
-  // state: 'not-started' | 'absent' | 'present' | 'finished'
-  function getTodayStatus(item) {
-    const idx = getTodayIndex(item);
-    if (idx < 0) return { state: 'not-started', label: 'Belum Dimulai', idx };
-    if (idx >= item.duration) return { state: 'finished', label: 'Periode Selesai', idx };
-    if (item.attendance[idx]) return { state: 'present', label: '✓ Sudah Absen Hari Ini', idx };
-    return { state: 'absent', label: '✕ Belum Absen Hari Ini', idx };
+  // Status absen hari ini, tergantung resetMode item:
+  // - 'fixed'   -> reset di jam tertentu (resetHour), sama buat semua device
+  // - 'rolling' -> reset 24 jam persis sejak klik "Absen Sekarang" terakhir
+  function getClaimStatus(item) {
+    const resetHour = item.resetHour || 0;
+
+    if (item.resetMode === 'rolling') {
+      if (getChecked(item) >= item.duration) {
+        return { eligible: false, state: 'finished', label: 'Periode Selesai', detail: '', idx: -1 };
+      }
+      if (!item.lastClaimAt) {
+        return { eligible: true, state: 'absent', label: '✕ Belum Absen', detail: 'Klik "Absen Sekarang" untuk mulai', idx: -1 };
+      }
+      const nextAt = item.lastClaimAt + 24 * 3600 * 1000;
+      const now = Date.now();
+      if (now >= nextAt) {
+        return { eligible: true, state: 'absent', label: '✕ Belum Absen', detail: 'Sudah bisa absen lagi', idx: -1 };
+      }
+      return { eligible: false, state: 'present', label: '✓ Sudah Absen', detail: `Reset dalam ${formatDuration(nextAt - now)}`, idx: -1 };
+    }
+
+    // fixed mode (termasuk default jam 00:00)
+    if (!item.startDate) return { eligible: false, state: 'not-started', label: 'Belum Dimulai', detail: '', idx: -1 };
+    const idx = daysBetween(item.startDate, logicalDateStr(resetHour));
+    const resetLabel = resetHour === 0 ? 'jam 00:00' : `jam ${pad2(resetHour)}:00`;
+    if (idx < 0) return { eligible: false, state: 'not-started', label: 'Belum Dimulai', detail: '', idx };
+    if (idx >= item.duration) return { eligible: false, state: 'finished', label: 'Periode Selesai', detail: '', idx };
+    if (item.attendance[idx]) {
+      return { eligible: false, state: 'present', label: '✓ Sudah Absen Hari Ini', detail: `Reset ${resetLabel}`, idx };
+    }
+    return { eligible: true, state: 'absent', label: '✕ Belum Absen Hari Ini', detail: `Reset ${resetLabel}`, idx };
+  }
+
+  function resetModeLabel(item) {
+    if (item.resetMode === 'rolling') return '24 jam dari klik terakhir';
+    const h = item.resetHour || 0;
+    return h === 0 ? 'Jam 00:00 (ganti tanggal)' : `Jam ${pad2(h)}:00`;
+  }
+
+  // Klik tombol "Absen Sekarang"
+  function claimAttendance(itemId) {
+    const item = data.find(d => d.id === itemId);
+    if (!item) return;
+    const status = getClaimStatus(item);
+    if (!status.eligible) return;
+
+    if (item.resetMode === 'rolling') {
+      const idx = item.attendance.findIndex(v => !v);
+      if (idx === -1) return;
+      item.attendance[idx] = true;
+    } else {
+      if (status.idx < 0 || status.idx >= item.duration) return;
+      item.attendance[status.idx] = true;
+    }
+    item.lastClaimAt = Date.now();
+    saveData();
+    render();
   }
 
   // ---- Unique id (aman dipakai multi-device tanpa tabrakan) ----
@@ -128,6 +199,9 @@
       if (item.attendance.length > item.duration) item.attendance = item.attendance.slice(0, item.duration);
       if (typeof item.note !== 'string') item.note = '';
       if (!item.startDate) item.startDate = todayStr();
+      if (item.resetMode !== 'fixed' && item.resetMode !== 'rolling') item.resetMode = 'fixed';
+      if (typeof item.resetHour !== 'number' || item.resetHour < 0 || item.resetHour > 23) item.resetHour = 0;
+      if (typeof item.lastClaimAt !== 'number') item.lastClaimAt = null;
       if (item.id === undefined || item.id === null) item.id = makeId();
       item.id = String(item.id);
     });
@@ -187,6 +261,9 @@
       'auth/weak-password': 'Password terlalu lemah, minimal 6 karakter.',
       'auth/too-many-requests': 'Terlalu banyak percobaan gagal. Coba lagi nanti.',
       'auth/network-request-failed': 'Gagal konek ke server, cek koneksi internet.',
+      'auth/operation-not-allowed': 'Login Email/Password belum diaktifkan di Firebase Console (Authentication → Sign-in method → aktifkan Email/Password).',
+      'auth/configuration-not-found': 'Firebase Authentication belum di-setup untuk project ini (buka Authentication → Get started di Firebase Console).',
+      'auth/unauthorized-domain': 'Domain/alamat website ini belum diizinkan di Firebase (Authentication → Settings → Authorized domains → tambahkan domainnya).',
     };
     return map[err.code] || `Terjadi kesalahan: ${err.message}`;
   }
@@ -403,6 +480,14 @@
     return Math.round((getChecked(item) / item.duration) * 100);
   }
 
+  // Index hari terakhir yang sudah dicentang (bukan berdasar tanggal kalender)
+  function getLastCheckedIndex(item) {
+    for (let i = item.attendance.length - 1; i >= 0; i--) {
+      if (item.attendance[i]) return i;
+    }
+    return -1;
+  }
+
   // ---- Filtering ----
   function filteredData() {
     let result = data;
@@ -453,14 +538,15 @@
       const status = getStatus(item);
       const statusLabel = getStatusLabel(status);
       const percent = pct(item);
-      const today = getTodayStatus(item);
+      const claim = getClaimStatus(item);
+      const lastIdx = getLastCheckedIndex(item);
 
       // Build mini day grid
       let daysCells = '';
       for (let i = 0; i < item.duration; i++) {
         const classes = ['day-cell'];
         if (item.attendance[i]) classes.push('checked');
-        if (i === today.idx) classes.push('today');
+        if (i === lastIdx) classes.push('last-checked');
         daysCells += `<div class="${classes.join(' ')}" data-item-id="${item.id}" data-day="${i}" title="Hari ${i + 1}">${i + 1}</div>`;
       }
 
@@ -492,8 +578,15 @@
           </div>
           ${noteHtml}
           <div class="card-today-row">
-            <span class="today-badge ${today.state}">${today.label}</span>
+            <span class="today-badge ${claim.state}">${claim.label}</span>
+            ${claim.detail ? `<span class="claim-detail">${escHtml(claim.detail)}</span>` : ''}
           </div>
+          ${claim.state === 'absent' || claim.state === 'present' ? `
+          <div class="card-claim-row">
+            <button class="btn-claim" data-item-id="${item.id}" ${claim.eligible ? '' : 'disabled'}>
+              ${claim.eligible ? '✓ Absen Sekarang' : '🔒 Sudah Diklaim'}
+            </button>
+          </div>` : ''}
           <div class="card-progress">
             <div class="progress-info">
               <span class="progress-text">${checked} / ${item.duration} hari</span>
@@ -552,10 +645,40 @@
     $inputName.value = mode === 'edit' ? item.name : '';
     $inputNote.value = mode === 'edit' ? (item.note || '') : '';
     selectedDuration = mode === 'edit' ? item.duration : 30;
+    selectedResetMode = mode === 'edit' ? (item.resetMode || 'fixed') : 'fixed';
+    selectedResetHour = mode === 'edit' ? (item.resetHour || 0) : 0;
     updateDurationBtns();
+    updateResetModeBtns();
     openModal($modalForm);
     setTimeout(() => $inputName.focus(), 100);
   }
+
+  function updateResetModeBtns() {
+    const uiKey = selectedResetMode === 'rolling' ? 'rolling' : (selectedResetHour === 0 ? 'fixed0' : 'fixedcustom');
+    $resetModeOptions.querySelectorAll('.reset-mode-btn').forEach(btn => {
+      btn.classList.toggle('active', btn.dataset.mode === uiKey);
+    });
+    $resetHourRow.style.display = uiKey === 'fixedcustom' ? '' : 'none';
+    if (uiKey === 'fixedcustom') $inputResetHour.value = selectedResetHour;
+  }
+
+  $resetModeOptions.addEventListener('click', e => {
+    const btn = e.target.closest('.reset-mode-btn');
+    if (!btn) return;
+    const key = btn.dataset.mode;
+    if (key === 'fixed0') { selectedResetMode = 'fixed'; selectedResetHour = 0; }
+    else if (key === 'fixedcustom') { selectedResetMode = 'fixed'; selectedResetHour = parseInt($inputResetHour.value) || 20; }
+    else if (key === 'rolling') { selectedResetMode = 'rolling'; }
+    updateResetModeBtns();
+  });
+
+  $inputResetHour.addEventListener('input', () => {
+    let h = parseInt($inputResetHour.value);
+    if (isNaN(h)) h = 0;
+    h = Math.max(0, Math.min(23, h));
+    selectedResetHour = h;
+    selectedResetMode = 'fixed';
+  });
 
   function updateDurationBtns() {
     $durationOptions.querySelectorAll('.duration-btn').forEach(btn => {
@@ -590,6 +713,8 @@
         item.name = name;
         item.note = note;
         item.duration = selectedDuration;
+        item.resetMode = selectedResetMode;
+        item.resetHour = selectedResetHour;
 
         // Adjust attendance array
         if (selectedDuration > oldDuration) {
@@ -628,7 +753,10 @@
         note,
         duration: selectedDuration,
         attendance: att,
-        startDate: todayStr(),
+        resetMode: selectedResetMode,
+        resetHour: selectedResetHour,
+        lastClaimAt: null,
+        startDate: logicalDateStr(selectedResetHour),
       });
     }
 
@@ -687,6 +815,7 @@
     } else {
       $modalDaysNote.style.display = 'none';
     }
+    $modalDaysResetMode.textContent = `⏱️ Reset: ${resetModeLabel(item)}`;
     renderDaysModal(item);
     openModal($modalDays);
   }
@@ -694,24 +823,39 @@
   function renderDaysModal(item) {
     const checked = getChecked(item);
     const percent = pct(item);
-    const today = getTodayStatus(item);
+    const claim = getClaimStatus(item);
 
     $daysProgressText.textContent = `${checked} / ${item.duration} hari`;
     $daysProgressPct.textContent = `${percent}%`;
     $daysProgressFill.style.width = `${percent}%`;
 
-    $modalDaysTodayBadge.textContent = today.label;
-    $modalDaysTodayBadge.className = `today-badge ${today.state}`;
+    $modalDaysTodayBadge.textContent = claim.label;
+    $modalDaysTodayBadge.className = `today-badge ${claim.state}`;
+    $modalDaysClaimDetail.textContent = claim.detail || '';
+    $modalDaysClaimDetail.style.display = claim.detail ? '' : 'none';
 
+    if (claim.state === 'absent' || claim.state === 'present') {
+      $modalDaysClaimBtn.style.display = '';
+      $modalDaysClaimBtn.disabled = !claim.eligible;
+      $modalDaysClaimBtn.textContent = claim.eligible ? '✓ Absen Sekarang' : '🔒 Sudah Diklaim';
+    } else {
+      $modalDaysClaimBtn.style.display = 'none';
+    }
+
+    const lastIdx = getLastCheckedIndex(item);
     let cells = '';
     for (let i = 0; i < item.duration; i++) {
       const classes = ['day-cell'];
       if (item.attendance[i]) classes.push('checked');
-      if (i === today.idx) classes.push('today');
+      if (i === lastIdx) classes.push('last-checked');
       cells += `<div class="${classes.join(' ')}" data-day="${i}">${i + 1}</div>`;
     }
     $daysGrid.innerHTML = cells;
   }
+
+  $modalDaysClaimBtn.addEventListener('click', () => {
+    if (dayModalItemId !== null) claimAttendance(dayModalItemId);
+  });
 
   // Toggle day in modal
   $daysGrid.addEventListener('click', e => {
@@ -737,7 +881,8 @@
       `Reset semua absensi untuk "${item.name}"? Centang hari akan dihapus dan hitungan mulai dari hari ini lagi.`,
       () => {
         item.attendance = item.attendance.map(() => false);
-        item.startDate = todayStr();
+        item.startDate = logicalDateStr(item.resetHour || 0);
+        item.lastClaimAt = null;
         saveData();
         renderDaysModal(item);
         render();
@@ -749,8 +894,13 @@
   document.getElementById('modal-days-close').addEventListener('click', () => closeModal($modalDays));
   document.getElementById('modal-days-done').addEventListener('click', () => closeModal($modalDays));
 
-  // ---- Click on day cells in card ----
+  // ---- Klik tombol "Absen Sekarang" atau kotak hari di kartu ----
   $cardsGrid.addEventListener('click', e => {
+    const claimBtn = e.target.closest('.btn-claim');
+    if (claimBtn) {
+      claimAttendance(claimBtn.dataset.itemId);
+      return;
+    }
     const cell = e.target.closest('.day-cell');
     if (!cell) return;
     const itemId = cell.dataset.itemId;
@@ -800,7 +950,8 @@
       () => {
         data.forEach(item => {
           item.attendance = item.attendance.map(() => false);
-          item.startDate = todayStr();
+          item.startDate = logicalDateStr(item.resetHour || 0);
+          item.lastClaimAt = null;
         });
         saveData();
         render();
@@ -836,22 +987,12 @@
     if (e.key === 'Escape') closeAllModals();
   });
 
-  // ---- Auto-refresh badge "hari ini" saat lewat tengah malam / ganti tanggal ----
-  let lastKnownDate = todayStr();
-  setInterval(() => {
-    const now = todayStr();
-    if (now !== lastKnownDate) {
-      lastKnownDate = now;
-      render();
-    }
-  }, 30 * 1000); // cek tiap 30 detik, ringan dan cukup responsif
+  // ---- Auto-refresh badge/countdown (jam custom, rolling 24 jam, ganti tanggal) ----
+  setInterval(() => render(), 30 * 1000); // cek tiap 30 detik, ringan dan cukup responsif
 
   // Refresh juga saat tab kembali aktif (misal HP dikunci lalu dibuka lagi)
   document.addEventListener('visibilitychange', () => {
-    if (document.visibilityState === 'visible') {
-      lastKnownDate = todayStr();
-      render();
-    }
+    if (document.visibilityState === 'visible') render();
   });
 
   // ---- Init ----
