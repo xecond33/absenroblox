@@ -129,6 +129,7 @@ body::before {
   border-bottom: 1px solid var(--border);
   margin: 0 calc(-1 * var(--space-md));
   padding: 0 var(--space-md);
+  overflow-x: hidden;
 }
 
 .header-inner {
@@ -138,7 +139,10 @@ body::before {
   align-items: center;
   justify-content: space-between;
   padding: var(--space-md) 0;
-  gap: var(--space-md);
+  gap: var(--space-sm);
+  flex-wrap: wrap;
+  width: 100%;
+  box-sizing: border-box;
 }
 
 .logo {
@@ -345,6 +349,8 @@ body::before {
   display: flex;
   align-items: center;
   gap: var(--space-sm);
+  flex-wrap: wrap;
+  justify-content: flex-end;
 }
 
 /* ==============================
@@ -917,6 +923,9 @@ body::before {
   border-radius: var(--radius-xl);
   width: 100%;
   max-width: 440px;
+  max-height: 90vh;
+  display: flex;
+  flex-direction: column;
   box-shadow: var(--shadow-lg);
   transform: scale(0.95) translateY(10px);
   transition: transform var(--duration) var(--ease);
@@ -928,6 +937,13 @@ body::before {
 
 .modal-sm {
   max-width: 380px;
+}
+
+/* Modal konfirmasi bisa muncul di atas modal lain yang masih kebuka (mis. pas
+   "Reset Absensi" dipencet dari dalam modal detail hari), jadi z-index-nya
+   harus lebih tinggi dari modal-overlay biasa (1000), biar gak ketutupan. */
+#modal-confirm {
+  z-index: 1100;
 }
 
 .modal-days {
@@ -943,6 +959,7 @@ body::before {
   justify-content: space-between;
   padding: var(--space-lg);
   border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
 }
 
 .modal-header h2 {
@@ -969,6 +986,8 @@ body::before {
 .modal-body {
   padding: var(--space-lg);
   overflow-y: auto;
+  flex: 1;
+  min-height: 0;
 }
 
 .modal-footer {
@@ -978,6 +997,7 @@ body::before {
   gap: var(--space-sm);
   padding: var(--space-md) var(--space-lg);
   border-top: 1px solid var(--border);
+  flex-shrink: 0;
 }
 
 /* Form */
@@ -1000,6 +1020,7 @@ body::before {
 }
 
 .form-group input[type="text"],
+.form-group input[type="number"],
 .form-group input[type="email"],
 .form-group input[type="password"] {
   width: 100%;
@@ -1052,34 +1073,118 @@ body::before {
   box-shadow: 0 0 0 3px var(--accent-dim);
 }
 
-.duration-options {
-  display: flex;
-  gap: var(--space-sm);
-}
-
-.duration-btn {
-  flex: 1;
+.form-group input[type="number"]#input-duration {
+  width: 100%;
   padding: var(--space-sm) var(--space-md);
   background: var(--bg-input);
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
-  color: var(--text-secondary);
+  color: var(--text-primary);
   font-family: var(--font);
-  font-size: 0.85rem;
+  font-size: 0.9rem;
+  outline: none;
+}
+
+.form-group input[type="number"]#input-duration:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-dim);
+}
+
+.reset-mode-options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-sm);
+}
+
+.reset-mode-btn {
+  padding: 7px 12px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  background: var(--bg-input);
+  color: var(--text-secondary);
+  font-size: 0.78rem;
   font-weight: 600;
   cursor: pointer;
   transition: all var(--duration) var(--ease);
 }
 
-.duration-btn:hover {
-  border-color: var(--text-muted);
-  color: var(--text-primary);
+.reset-mode-btn:hover {
+  border-color: var(--accent-light);
 }
 
-.duration-btn.active {
-  background: var(--accent-dim);
+.reset-mode-btn.active {
+  background: var(--accent);
   border-color: var(--accent);
-  color: var(--accent-light);
+  color: #fff;
+}
+
+.reset-hour-row {
+  margin-top: var(--space-sm);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.reset-hour-row input[type="number"] {
+  width: 100px;
+  padding: var(--space-sm) var(--space-md);
+  background: var(--bg-input);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text-primary);
+  font-family: var(--font);
+  font-size: 0.9rem;
+  outline: none;
+}
+
+.reset-hour-row input[type="number"]:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-dim);
+}
+
+.claim-detail {
+  font-size: 0.72rem;
+  color: var(--text-muted);
+}
+
+.card-claim-row {
+  padding: 0 var(--space-lg) var(--space-md);
+}
+
+.btn-claim {
+  width: 100%;
+  padding: 9px 14px;
+  border-radius: var(--radius-sm);
+  border: none;
+  background: var(--accent);
+  color: #fff;
+  font-size: 0.82rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all var(--duration) var(--ease);
+}
+
+.btn-claim:hover:not(:disabled) {
+  background: var(--accent-light);
+  transform: translateY(-1px);
+}
+
+.btn-claim:disabled {
+  background: var(--bg-elevated);
+  color: var(--text-muted);
+  cursor: not-allowed;
+}
+
+.btn-claim-lg {
+  margin-bottom: var(--space-md);
+  font-size: 0.9rem;
+  padding: 12px 16px;
+}
+
+.days-reset-mode {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  margin-bottom: var(--space-sm);
 }
 
 /* Days modal progress */
@@ -1186,6 +1291,88 @@ body::before {
   .btn-label {
     display: none;
   }
+
+  .header-inner {
+    flex-direction: column;
+    align-items: stretch;
+    justify-content: flex-start;
+    text-align: center;
+    gap: 6px;
+    padding: var(--space-sm) 0;
+  }
+
+  .logo {
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+
+  .header-actions {
+    width: 100%;
+    justify-content: center;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+
+  .header-actions .btn {
+    padding: 8px 10px;
+    gap: 4px;
+  }
+
+  .user-email {
+    margin-right: 0;
+    max-width: none;
+  }
+
+  .auth-box {
+    padding: var(--space-lg);
+  }
+
+  .modal {
+    max-height: 92vh;
+  }
+
+  .modal-header {
+    padding: var(--space-md);
+  }
+
+  .modal-body {
+    padding: var(--space-md);
+  }
+
+  .modal-footer {
+    padding: var(--space-sm) var(--space-md);
+    flex-wrap: wrap;
+  }
+
+  .modal-footer .btn {
+    flex: 1;
+    justify-content: center;
+  }
+
+  .reset-mode-options {
+    gap: 6px;
+  }
+
+  .reset-mode-btn {
+    font-size: 0.72rem;
+    padding: 8px 6px;
+  }
+}
+
+@media (max-width: 480px) {
+  .user-email {
+    max-width: 110px;
+    font-size: 0.7rem;
+  }
+
+  .sync-badge {
+    font-size: 0.58rem;
+    padding: 2px 7px;
+  }
+
+  .logo h1 {
+    font-size: 1.1rem;
+  }
 }
 
 @media (max-width: 400px) {
@@ -1219,6 +1406,23 @@ body::before {
 
   .card-days-grid {
     gap: 3px;
+  }
+
+  .card-name {
+    font-size: 0.95rem;
+  }
+
+  .btn-claim {
+    font-size: 0.76rem;
+    padding: 8px 10px;
+  }
+
+  .reset-hour-row input[type="number"] {
+    width: 100%;
+  }
+
+  .auth-box {
+    padding: var(--space-md);
   }
 }
 

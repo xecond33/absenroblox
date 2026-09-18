@@ -19,7 +19,7 @@
     <div class="auth-box">
       <div class="auth-logo">
         <span class="logo-icon">📋</span>
-        <h1>AbsensiMap</h1>
+        <h1>Absensi Map</h1>
       </div>
       <p class="auth-subtitle">Progress absensi tersimpan aman di akunmu sendiri &mdash; bisa diakses dari device manapun.</p>
 
@@ -163,9 +163,8 @@
       </div>
       <div class="filter-chips" id="filter-chips">
         <button class="chip active" data-filter="all">Semua</button>
-        <button class="chip" data-filter="7">7 Hari</button>
-        <button class="chip" data-filter="14">14 Hari</button>
-        <button class="chip" data-filter="30">30 Hari</button>
+        <button class="chip" data-filter="not-today">Belum Absen Hari Ini</button>
+        <button class="chip" data-filter="done-today">Sudah Absen Hari Ini</button>
         <button class="chip" data-filter="running">Berjalan</button>
         <button class="chip" data-filter="done">Selesai</button>
       </div>
@@ -197,12 +196,24 @@
           <input type="text" id="input-name" placeholder="Masukkan nama..." autocomplete="off">
         </div>
         <div class="form-group">
-          <label for="input-duration">Durasi Absensi</label>
-          <div class="duration-options" id="duration-options">
-            <button class="duration-btn" data-duration="7">7 Hari</button>
-            <button class="duration-btn" data-duration="14">14 Hari</button>
-            <button class="duration-btn active" data-duration="30">30 Hari</button>
+          <label for="input-duration">Durasi Absensi (hari)</label>
+          <input type="number" id="input-duration" min="1" max="31" placeholder="Misal: 30 atau 31">
+        </div>
+        <div class="form-group">
+          <label>Waktu Reset</label>
+          <div class="reset-mode-options" id="reset-mode-options">
+            <button type="button" class="reset-mode-btn active" data-mode="fixed0">Jam 00:00</button>
+            <button type="button" class="reset-mode-btn" data-mode="fixedcustom">Jam Custom</button>
+            <button type="button" class="reset-mode-btn" data-mode="rolling">24 Jam dari Klik Terakhir</button>
           </div>
+          <div class="reset-hour-row" id="reset-hour-row" style="display:none;">
+            <label for="input-reset-hour">Reset tiap jam berapa? (0–23)</label>
+            <input type="number" id="input-reset-hour" min="0" max="23" value="20">
+          </div>
+        </div>
+        <div class="form-group" id="form-group-initial-progress">
+          <label for="input-initial-progress" id="label-initial-progress">Sudah Absen Berapa Hari? (opsional, buat data lama)</label>
+          <input type="number" id="input-initial-progress" min="0" value="0" placeholder="0">
         </div>
         <div class="form-group">
           <label for="input-note">Keterangan (opsional)</label>
@@ -242,9 +253,12 @@
       </div>
       <div class="modal-body">
         <p class="days-note" id="modal-days-note" style="display:none;"></p>
+        <p class="days-reset-mode" id="modal-days-reset-mode"></p>
         <div class="days-today-badge-wrap">
           <span class="today-badge" id="modal-days-today-badge"></span>
+          <span class="claim-detail" id="modal-days-claim-detail"></span>
         </div>
+        <button class="btn-claim btn-claim-lg" id="modal-days-claim-btn" style="display:none;"></button>
         <div class="days-progress-bar-wrap">
           <div class="days-progress-info">
             <span id="modal-days-progress-text">0/0</span>

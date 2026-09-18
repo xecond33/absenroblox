@@ -10,21 +10,15 @@
   // ---- Constants ----
   const STORAGE_KEY = 'absensimap_data';
 
-  const DEFAULT_DATA = [
-    { name: '404', duration: 30 },
-    { name: '90s blok', duration: 30 },
-    { name: 'flux', duration: 30 },
-    { name: 'lawson', duration: 30 },
-    { name: 'la miami', duration: 30 },
-    { name: 'noir pulse', duration: 30 },
-  ];
-
   // ---- State ----
   let data = [];
   let currentFilter = 'all';
   let searchQuery = '';
   let editingId = null; // null = add mode, id = edit mode
+  let editingOriginalProgress = 0;
   let selectedDuration = 30;
+  let selectedResetMode = 'fixed'; // 'fixed' | 'rolling'
+  let selectedResetHour = 0; // dipakai kalau resetMode === 'fixed'
   let dayModalItemId = null;
 
   // ---- Sync state ----
@@ -67,7 +61,13 @@
   const $modalFormTitle = document.getElementById('modal-form-title');
   const $inputName = document.getElementById('input-name');
   const $inputNote = document.getElementById('input-note');
-  const $durationOptions = document.getElementById('duration-options');
+  const $formGroupInitialProgress = document.getElementById('form-group-initial-progress');
+  const $labelInitialProgress = document.getElementById('label-initial-progress');
+  const $inputInitialProgress = document.getElementById('input-initial-progress');
+  const $inputDuration = document.getElementById('input-duration');
+  const $resetModeOptions = document.getElementById('reset-mode-options');
+  const $resetHourRow = document.getElementById('reset-hour-row');
+  const $inputResetHour = document.getElementById('input-reset-hour');
   const $modalFormSave = document.getElementById('modal-form-save');
 
   // Modal: Confirm
@@ -80,19 +80,39 @@
   const $modalDays = document.getElementById('modal-days');
   const $modalDaysTitle = document.getElementById('modal-days-title');
   const $modalDaysNote = document.getElementById('modal-days-note');
+  const $modalDaysResetMode = document.getElementById('modal-days-reset-mode');
   const $modalDaysTodayBadge = document.getElementById('modal-days-today-badge');
+  const $modalDaysClaimDetail = document.getElementById('modal-days-claim-detail');
+  const $modalDaysClaimBtn = document.getElementById('modal-days-claim-btn');
   const $daysGrid = document.getElementById('days-grid');
   const $daysProgressText = document.getElementById('modal-days-progress-text');
   const $daysProgressPct = document.getElementById('modal-days-progress-pct');
   const $daysProgressFill = document.getElementById('modal-days-progress-fill');
 
-  // ---- Date helpers (buat badge sudah/belum absen hari ini) ----
+  // ---- Date & reset-mode helpers ----
+  function pad2(n) { return String(n).padStart(2, '0'); }
+
+  function dateStrFromDate(d) {
+    return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
+  }
+
+  // "Tanggal logis" hari ini, digeser sesuai jam reset (mis. resetHour=20 -> hari
+  // baru dianggap mulai jam 20:00, bukan jam 00:00). Catatan: pakai jam lokal
+  // device, jadi asumsinya device kamu sudah di zona WIB.
+  function logicalDateStr(resetHour) {
+    const d = new Date(Date.now() - (resetHour || 0) * 3600000);
+    return dateStrFromDate(d);
+  }
+
   function todayStr() {
-    const d = new Date();
-    const y = d.getFullYear();
-    const m = String(d.getMonth() + 1).padStart(2, '0');
-    const day = String(d.getDate()).padStart(2, '0');
-    return `${y}-${m}-${day}`;
+    return logicalDateStr(0);
+  }
+
+  // Tanggal logis, digeser mundur sekian hari lagi (buat item yang dimasukin
+  // dengan progress awal, misal udah jalan 7 hari sebelum dicatat di app ini)
+  function shiftDateStr(resetHour, extraDaysBack) {
+    const d = new Date(Date.now() - (resetHour || 0) * 3600000 - (extraDaysBack || 0) * 86400000);
+    return dateStrFromDate(d);
   }
 
   function daysBetween(startStr, endStr) {
@@ -101,18 +121,71 @@
     return Math.round((end - start) / 86400000);
   }
 
-  function getTodayIndex(item) {
-    if (!item.startDate) return -1;
-    return daysBetween(item.startDate, todayStr());
+  function formatDuration(ms) {
+    const totalMin = Math.max(0, Math.ceil(ms / 60000));
+    const h = Math.floor(totalMin / 60);
+    const m = totalMin % 60;
+    if (h > 0) return `${h}j ${m}m`;
+    return `${m}m`;
   }
 
-  // state: 'not-started' | 'absent' | 'present' | 'finished'
-  function getTodayStatus(item) {
-    const idx = getTodayIndex(item);
-    if (idx < 0) return { state: 'not-started', label: 'Belum Dimulai', idx };
-    if (idx >= item.duration) return { state: 'finished', label: 'Periode Selesai', idx };
-    if (item.attendance[idx]) return { state: 'present', label: '✓ Sudah Absen Hari Ini', idx };
-    return { state: 'absent', label: '✕ Belum Absen Hari Ini', idx };
+  // Status absen hari ini, tergantung resetMode item:
+  // - 'fixed'   -> reset di jam tertentu (resetHour), sama buat semua device
+  // - 'rolling' -> reset 24 jam persis sejak klik "Absen Sekarang" terakhir
+  function getClaimStatus(item) {
+    const resetHour = item.resetHour || 0;
+
+    if (item.resetMode === 'rolling') {
+      if (getChecked(item) >= item.duration) {
+        return { eligible: false, state: 'finished', label: 'Periode Selesai', detail: '', idx: -1 };
+      }
+      if (!item.lastClaimAt) {
+        return { eligible: true, state: 'absent', label: '✕ Belum Absen', detail: 'Klik "Absen Sekarang" untuk mulai', idx: -1 };
+      }
+      const nextAt = item.lastClaimAt + 24 * 3600 * 1000;
+      const now = Date.now();
+      if (now >= nextAt) {
+        return { eligible: true, state: 'absent', label: '✕ Belum Absen', detail: 'Sudah bisa absen lagi', idx: -1 };
+      }
+      return { eligible: false, state: 'present', label: '✓ Sudah Absen', detail: `Reset dalam ${formatDuration(nextAt - now)}`, idx: -1 };
+    }
+
+    // fixed mode (termasuk default jam 00:00)
+    if (!item.startDate) return { eligible: false, state: 'not-started', label: 'Belum Dimulai', detail: '', idx: -1 };
+    const idx = daysBetween(item.startDate, logicalDateStr(resetHour));
+    const resetLabel = resetHour === 0 ? 'jam 00:00' : `jam ${pad2(resetHour)}:00`;
+    if (idx < 0) return { eligible: false, state: 'not-started', label: 'Belum Dimulai', detail: '', idx };
+    if (idx >= item.duration) return { eligible: false, state: 'finished', label: 'Periode Selesai', detail: '', idx };
+    if (item.attendance[idx]) {
+      return { eligible: false, state: 'present', label: '✓ Sudah Absen Hari Ini', detail: `Reset ${resetLabel}`, idx };
+    }
+    return { eligible: true, state: 'absent', label: '✕ Belum Absen Hari Ini', detail: `Reset ${resetLabel}`, idx };
+  }
+
+  function resetModeLabel(item) {
+    if (item.resetMode === 'rolling') return '24 jam dari klik terakhir';
+    const h = item.resetHour || 0;
+    return h === 0 ? 'Jam 00:00 (ganti tanggal)' : `Jam ${pad2(h)}:00`;
+  }
+
+  // Klik tombol "Absen Sekarang"
+  function claimAttendance(itemId) {
+    const item = data.find(d => d.id === itemId);
+    if (!item) return;
+    const status = getClaimStatus(item);
+    if (!status.eligible) return;
+
+    if (item.resetMode === 'rolling') {
+      const idx = item.attendance.findIndex(v => !v);
+      if (idx === -1) return;
+      item.attendance[idx] = true;
+    } else {
+      if (status.idx < 0 || status.idx >= item.duration) return;
+      item.attendance[status.idx] = true;
+    }
+    item.lastClaimAt = Date.now();
+    saveData();
+    render();
   }
 
   // ---- Unique id (aman dipakai multi-device tanpa tabrakan) ----
@@ -128,6 +201,9 @@
       if (item.attendance.length > item.duration) item.attendance = item.attendance.slice(0, item.duration);
       if (typeof item.note !== 'string') item.note = '';
       if (!item.startDate) item.startDate = todayStr();
+      if (item.resetMode !== 'fixed' && item.resetMode !== 'rolling') item.resetMode = 'fixed';
+      if (typeof item.resetHour !== 'number' || item.resetHour < 0 || item.resetHour > 23) item.resetHour = 0;
+      if (typeof item.lastClaimAt !== 'number') item.lastClaimAt = null;
       if (item.id === undefined || item.id === null) item.id = makeId();
       item.id = String(item.id);
     });
@@ -279,7 +355,7 @@
     auth.onAuthStateChanged(user => {
       if (user) {
         currentUser = user;
-        $userEmail.textContent = user.email || '';
+        $userEmail.textContent = shortEmail(user.email);
         showApp();
         startDataSync();
       } else {
@@ -291,6 +367,12 @@
         showAuthScreen();
       }
     });
+  }
+
+  // Tampilkan cuma nama depan email, misal "admin@gmail.com" -> "admin"
+  function shortEmail(email) {
+    if (!email) return '';
+    return email.split('@')[0];
   }
 
   function setSyncBadge(state) {
@@ -315,18 +397,7 @@
   function loadLocalData() {
     try {
       const raw = localStorage.getItem(STORAGE_KEY);
-      if (raw) {
-        data = JSON.parse(raw);
-      } else {
-        data = DEFAULT_DATA.map(d => ({
-          id: makeId(),
-          name: d.name,
-          duration: d.duration,
-          attendance: Array(d.duration).fill(false),
-          note: '',
-          startDate: todayStr(),
-        }));
-      }
+      data = raw ? JSON.parse(raw) : [];
       normalizeData();
     } catch {
       data = [];
@@ -355,18 +426,6 @@
         const val = snapshot.val();
         data = val ? Object.values(val) : [];
         normalizeData();
-        // Kalau database masih kosong (project Firebase baru), isi dengan default sekali saja
-        if (!val && !firstSyncDone) {
-          data = DEFAULT_DATA.map(d => ({
-            id: makeId(),
-            name: d.name,
-            duration: d.duration,
-            attendance: Array(d.duration).fill(false),
-            note: '',
-            startDate: todayStr(),
-          }));
-          saveData();
-        }
         firstSyncDone = true;
         render();
       }, err => {
@@ -423,11 +482,10 @@
       result = result.filter(d => d.name.toLowerCase().includes(q));
     }
 
-    if (currentFilter === '7') result = result.filter(d => d.duration === 7);
-    else if (currentFilter === '14') result = result.filter(d => d.duration === 14);
-    else if (currentFilter === '30') result = result.filter(d => d.duration === 30);
-    else if (currentFilter === 'running') result = result.filter(d => getStatus(d) === 'running');
+    if (currentFilter === 'running') result = result.filter(d => getStatus(d) === 'running');
     else if (currentFilter === 'done') result = result.filter(d => getStatus(d) === 'done');
+    else if (currentFilter === 'not-today') result = result.filter(d => getClaimStatus(d).state === 'absent');
+    else if (currentFilter === 'done-today') result = result.filter(d => getClaimStatus(d).state === 'present');
 
     return result;
   }
@@ -464,7 +522,7 @@
       const status = getStatus(item);
       const statusLabel = getStatusLabel(status);
       const percent = pct(item);
-      const today = getTodayStatus(item);
+      const claim = getClaimStatus(item);
       const lastIdx = getLastCheckedIndex(item);
 
       // Build mini day grid
@@ -494,6 +552,9 @@
               </div>
             </div>
             <div class="card-actions">
+              <button class="btn-icon" onclick="AbsensiMap.openDays('${item.id}')" title="Lihat Detail / Reset Absensi">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+              </button>
               <button class="btn-icon" onclick="AbsensiMap.editItem('${item.id}')" title="Edit">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
               </button>
@@ -504,8 +565,15 @@
           </div>
           ${noteHtml}
           <div class="card-today-row">
-            <span class="today-badge ${today.state}">${today.label}</span>
+            <span class="today-badge ${claim.state}">${claim.label}</span>
+            ${claim.detail ? `<span class="claim-detail">${escHtml(claim.detail)}</span>` : ''}
           </div>
+          ${claim.state === 'absent' || claim.state === 'present' ? `
+          <div class="card-claim-row">
+            <button class="btn-claim" data-item-id="${item.id}" ${claim.eligible ? '' : 'disabled'}>
+              ${claim.eligible ? '✓ Absen Sekarang' : '🔒 Sudah Diklaim'}
+            </button>
+          </div>` : ''}
           <div class="card-progress">
             <div class="progress-info">
               <span class="progress-text">${checked} / ${item.duration} hari</span>
@@ -564,29 +632,71 @@
     $inputName.value = mode === 'edit' ? item.name : '';
     $inputNote.value = mode === 'edit' ? (item.note || '') : '';
     selectedDuration = mode === 'edit' ? item.duration : 30;
-    updateDurationBtns();
+    selectedResetMode = mode === 'edit' ? (item.resetMode || 'fixed') : 'fixed';
+    selectedResetHour = mode === 'edit' ? (item.resetHour || 0) : 0;
+
+    $formGroupInitialProgress.style.display = '';
+    if (mode === 'edit') {
+      editingOriginalProgress = getChecked(item);
+      $inputInitialProgress.value = editingOriginalProgress;
+      $labelInitialProgress.textContent = 'Ubah Jadi Sudah Absen Berapa Hari? (opsional, biarkan kalau gak mau ubah)';
+    } else {
+      editingOriginalProgress = 0;
+      $inputInitialProgress.value = 0;
+      $labelInitialProgress.textContent = 'Sudah Absen Berapa Hari? (opsional, buat data lama)';
+    }
+
+    $inputDuration.value = mode === 'edit' ? selectedDuration : '';
+    updateResetModeBtns();
     openModal($modalForm);
     setTimeout(() => $inputName.focus(), 100);
   }
 
-  function updateDurationBtns() {
-    $durationOptions.querySelectorAll('.duration-btn').forEach(btn => {
-      btn.classList.toggle('active', parseInt(btn.dataset.duration) === selectedDuration);
+  function updateResetModeBtns() {
+    const uiKey = selectedResetMode === 'rolling' ? 'rolling' : (selectedResetHour === 0 ? 'fixed0' : 'fixedcustom');
+    $resetModeOptions.querySelectorAll('.reset-mode-btn').forEach(btn => {
+      btn.classList.toggle('active', btn.dataset.mode === uiKey);
     });
+    $resetHourRow.style.display = uiKey === 'fixedcustom' ? '' : 'none';
+    if (uiKey === 'fixedcustom') $inputResetHour.value = selectedResetHour;
   }
 
-  // Duration buttons
-  $durationOptions.addEventListener('click', e => {
-    const btn = e.target.closest('.duration-btn');
+  $resetModeOptions.addEventListener('click', e => {
+    const btn = e.target.closest('.reset-mode-btn');
     if (!btn) return;
-    selectedDuration = parseInt(btn.dataset.duration);
-    updateDurationBtns();
+    const key = btn.dataset.mode;
+    if (key === 'fixed0') { selectedResetMode = 'fixed'; selectedResetHour = 0; }
+    else if (key === 'fixedcustom') { selectedResetMode = 'fixed'; selectedResetHour = parseInt($inputResetHour.value) || 20; }
+    else if (key === 'rolling') { selectedResetMode = 'rolling'; }
+    updateResetModeBtns();
+  });
+
+  $inputResetHour.addEventListener('input', () => {
+    let h = parseInt($inputResetHour.value);
+    if (isNaN(h)) h = 0;
+    h = Math.max(0, Math.min(23, h));
+    selectedResetHour = h;
+    selectedResetMode = 'fixed';
+  });
+
+  // Durasi manual (input angka, dibatasi maksimal 31 hari, boleh dikosongin dulu)
+  $inputDuration.addEventListener('input', () => {
+    if ($inputDuration.value === '') return; // biarin kosong, jangan dipaksa isi
+    let d = parseInt($inputDuration.value);
+    if (isNaN(d)) return;
+    if (d > 31) $inputDuration.value = 31;
   });
 
   // Save form
   $modalFormSave.addEventListener('click', () => {
     const name = $inputName.value.trim();
     const note = $inputNote.value.trim();
+
+    let durationVal = parseInt($inputDuration.value);
+    if (isNaN(durationVal) || durationVal < 1) durationVal = 1;
+    if (durationVal > 31) durationVal = 31;
+    selectedDuration = durationVal;
+
     if (!name) {
       $inputName.focus();
       $inputName.style.borderColor = 'var(--danger)';
@@ -599,48 +709,83 @@
       const item = data.find(d => d.id === editingId);
       if (item) {
         const oldDuration = item.duration;
+        const oldResetMode = item.resetMode || 'fixed';
+        const oldResetHour = item.resetHour || 0;
+        const resetSchemeChanged = (oldResetMode !== selectedResetMode) || (oldResetHour !== selectedResetHour);
+
         item.name = name;
         item.note = note;
+        item.resetMode = selectedResetMode;
+        item.resetHour = selectedResetHour;
+
+        let newProgress = parseInt($inputInitialProgress.value);
+        if (isNaN(newProgress)) newProgress = editingOriginalProgress;
+        newProgress = Math.max(0, Math.min(selectedDuration, newProgress));
+        const progressChanged = newProgress !== editingOriginalProgress;
+
         item.duration = selectedDuration;
 
-        // Adjust attendance array
-        if (selectedDuration > oldDuration) {
-          while (item.attendance.length < selectedDuration) item.attendance.push(false);
-        } else if (selectedDuration < oldDuration) {
-          const lostChecks = item.attendance.slice(selectedDuration).filter(Boolean).length;
-          if (lostChecks > 0) {
-            closeModal($modalForm);
-            showConfirm(
-              'Konfirmasi Perubahan',
-              `Durasi dikurangi dari ${oldDuration} ke ${selectedDuration} hari. ${lostChecks} data absensi di luar batas akan terhapus. Lanjutkan?`,
-              () => {
-                item.attendance = item.attendance.slice(0, selectedDuration);
-                saveData();
-                render();
-              },
-              () => {
-                item.duration = oldDuration;
-                item.name = name;
-                item.note = note;
-                saveData();
-                render();
-              }
-            );
-            return;
+        if (progressChanged) {
+          // Angka absen diubah manual -> susun ulang jadi N hari pertama tercentang,
+          // dan geser tanggal mulai supaya "hari ini" pas lanjut dari hari ke N+1.
+          // (item.resetHour di atas sudah nilai baru, jadi otomatis ikut skema reset yang baru.)
+          item.attendance = Array.from({ length: selectedDuration }, (_, i) => i < newProgress);
+          item.startDate = shiftDateStr(item.resetHour, newProgress);
+          item.lastClaimAt = null;
+        } else {
+          // Kalau jam/mode reset diubah tapi jumlah hari absen TIDAK diubah manual,
+          // startDate harus digeser ulang biar tetap sinkron sama skema reset yang baru.
+          // Tanpa ini, status "hari ini" bisa telat/nyangkut pas ganti jam reset
+          // (misalnya pindah ke jam 20:00) — ini yang bikin statusnya "ga balik".
+          if (resetSchemeChanged) {
+            const checkedSoFar = getChecked(item);
+            item.startDate = shiftDateStr(selectedResetHour, checkedSoFar);
+            item.lastClaimAt = null;
           }
-          item.attendance = item.attendance.slice(0, selectedDuration);
+          if (selectedDuration > oldDuration) {
+            while (item.attendance.length < selectedDuration) item.attendance.push(false);
+          } else if (selectedDuration < oldDuration) {
+            const lostChecks = item.attendance.slice(selectedDuration).filter(Boolean).length;
+            if (lostChecks > 0) {
+              closeModal($modalForm);
+              showConfirm(
+                'Konfirmasi Perubahan',
+                `Durasi dikurangi dari ${oldDuration} ke ${selectedDuration} hari. ${lostChecks} data absensi di luar batas akan terhapus. Lanjutkan?`,
+                () => {
+                  item.attendance = item.attendance.slice(0, selectedDuration);
+                  saveData();
+                  render();
+                },
+                () => {
+                  item.duration = oldDuration;
+                  item.name = name;
+                  item.note = note;
+                  saveData();
+                  render();
+                }
+              );
+              return;
+            }
+            item.attendance = item.attendance.slice(0, selectedDuration);
+          }
         }
       }
     } else {
       // Add
-      const att = Array(selectedDuration).fill(false);
+      let initialProgress = parseInt($inputInitialProgress.value) || 0;
+      initialProgress = Math.max(0, Math.min(selectedDuration, initialProgress));
+
+      const att = Array.from({ length: selectedDuration }, (_, i) => i < initialProgress);
       data.push({
         id: makeId(),
         name,
         note,
         duration: selectedDuration,
         attendance: att,
-        startDate: todayStr(),
+        resetMode: selectedResetMode,
+        resetHour: selectedResetHour,
+        lastClaimAt: null,
+        startDate: shiftDateStr(selectedResetHour, initialProgress),
       });
     }
 
@@ -699,6 +844,7 @@
     } else {
       $modalDaysNote.style.display = 'none';
     }
+    $modalDaysResetMode.textContent = `⏱️ Reset: ${resetModeLabel(item)}`;
     renderDaysModal(item);
     openModal($modalDays);
   }
@@ -706,14 +852,24 @@
   function renderDaysModal(item) {
     const checked = getChecked(item);
     const percent = pct(item);
-    const today = getTodayStatus(item);
+    const claim = getClaimStatus(item);
 
     $daysProgressText.textContent = `${checked} / ${item.duration} hari`;
     $daysProgressPct.textContent = `${percent}%`;
     $daysProgressFill.style.width = `${percent}%`;
 
-    $modalDaysTodayBadge.textContent = today.label;
-    $modalDaysTodayBadge.className = `today-badge ${today.state}`;
+    $modalDaysTodayBadge.textContent = claim.label;
+    $modalDaysTodayBadge.className = `today-badge ${claim.state}`;
+    $modalDaysClaimDetail.textContent = claim.detail || '';
+    $modalDaysClaimDetail.style.display = claim.detail ? '' : 'none';
+
+    if (claim.state === 'absent' || claim.state === 'present') {
+      $modalDaysClaimBtn.style.display = '';
+      $modalDaysClaimBtn.disabled = !claim.eligible;
+      $modalDaysClaimBtn.textContent = claim.eligible ? '✓ Absen Sekarang' : '🔒 Sudah Diklaim';
+    } else {
+      $modalDaysClaimBtn.style.display = 'none';
+    }
 
     const lastIdx = getLastCheckedIndex(item);
     let cells = '';
@@ -725,6 +881,10 @@
     }
     $daysGrid.innerHTML = cells;
   }
+
+  $modalDaysClaimBtn.addEventListener('click', () => {
+    if (dayModalItemId !== null) claimAttendance(dayModalItemId);
+  });
 
   // Toggle day in modal
   $daysGrid.addEventListener('click', e => {
@@ -750,7 +910,8 @@
       `Reset semua absensi untuk "${item.name}"? Centang hari akan dihapus dan hitungan mulai dari hari ini lagi.`,
       () => {
         item.attendance = item.attendance.map(() => false);
-        item.startDate = todayStr();
+        item.startDate = logicalDateStr(item.resetHour || 0);
+        item.lastClaimAt = null;
         saveData();
         renderDaysModal(item);
         render();
@@ -762,8 +923,13 @@
   document.getElementById('modal-days-close').addEventListener('click', () => closeModal($modalDays));
   document.getElementById('modal-days-done').addEventListener('click', () => closeModal($modalDays));
 
-  // ---- Click on day cells in card ----
+  // ---- Klik tombol "Absen Sekarang" atau kotak hari di kartu ----
   $cardsGrid.addEventListener('click', e => {
+    const claimBtn = e.target.closest('.btn-claim');
+    if (claimBtn) {
+      claimAttendance(claimBtn.dataset.itemId);
+      return;
+    }
     const cell = e.target.closest('.day-cell');
     if (!cell) return;
     const itemId = cell.dataset.itemId;
@@ -813,7 +979,8 @@
       () => {
         data.forEach(item => {
           item.attendance = item.attendance.map(() => false);
-          item.startDate = todayStr();
+          item.startDate = logicalDateStr(item.resetHour || 0);
+          item.lastClaimAt = null;
         });
         saveData();
         render();
@@ -849,22 +1016,13 @@
     if (e.key === 'Escape') closeAllModals();
   });
 
-  // ---- Auto-refresh badge "hari ini" saat lewat tengah malam / ganti tanggal ----
-  let lastKnownDate = todayStr();
-  setInterval(() => {
-    const now = todayStr();
-    if (now !== lastKnownDate) {
-      lastKnownDate = now;
-      render();
-    }
-  }, 30 * 1000); // cek tiap 30 detik, ringan dan cukup responsif
+  // Auto-refresh tiap 30 detik sengaja dimatikan (biar hemat, refresh manual aja
+  // dgn reload halaman kalau mau lihat status ter-update). Refresh tetap jalan
+  // otomatis pas buka lagi tab-nya (lihat visibilitychange di bawah).
 
-  // Refresh juga saat tab kembali aktif (misal HP dikunci lalu dibuka lagi)
+  // Refresh saat tab kembali aktif (misal HP dikunci lalu dibuka lagi)
   document.addEventListener('visibilitychange', () => {
-    if (document.visibilityState === 'visible') {
-      lastKnownDate = todayStr();
-      render();
-    }
+    if (document.visibilityState === 'visible') render();
   });
 
   // ---- Init ----
