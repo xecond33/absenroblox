@@ -639,7 +639,7 @@
     if (mode === 'edit') {
       editingOriginalProgress = getChecked(item);
       $inputInitialProgress.value = editingOriginalProgress;
-      $labelInitialProgress.textContent = 'Ubah Jadi Sudah Absen Berapa Hari? (opsional, biarkan kalau gak mau ubah)';
+      $labelInitialProgress.textContent = 'Sudah Absen Berapa Hari? (opsional, buat data lama)';
     } else {
       editingOriginalProgress = 0;
       $inputInitialProgress.value = 0;
