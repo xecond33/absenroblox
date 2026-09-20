@@ -1090,6 +1090,22 @@ body::before {
   box-shadow: 0 0 0 3px var(--accent-dim);
 }
 
+/* Number input: tombol panah atas/bawah (spinner) biar ikut tema gelap
+   - color-scheme: dark  -> panah native jadi terang & nyatu sama background gelap
+   - opacity: 1          -> di Chrome/Safari/Edge panah selalu kelihatan (default-nya cuma pas hover)
+   Berlaku buat #input-duration (form tambah/edit) dan input jam reset. */
+input[type="number"] {
+  color-scheme: dark;
+}
+
+input[type="number"]::-webkit-inner-spin-button,
+input[type="number"]::-webkit-outer-spin-button {
+  opacity: 1;
+  cursor: pointer;
+  height: 28px;
+  margin-left: var(--space-sm);
+}
+
 .reset-mode-options {
   display: flex;
   flex-wrap: wrap;
