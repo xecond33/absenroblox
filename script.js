@@ -886,20 +886,6 @@
     if (dayModalItemId !== null) claimAttendance(dayModalItemId);
   });
 
-  // Toggle day in modal
-  $daysGrid.addEventListener('click', e => {
-    const cell = e.target.closest('.day-cell');
-    if (!cell || dayModalItemId === null) return;
-    const item = data.find(d => d.id === dayModalItemId);
-    if (!item) return;
-    const dayIdx = parseInt(cell.dataset.day);
-    item.attendance[dayIdx] = !item.attendance[dayIdx];
-    saveData();
-    renderDaysModal(item);
-    renderStats();
-    renderCards();
-  });
-
   // Reset in days modal
   document.getElementById('modal-days-reset').addEventListener('click', () => {
     if (dayModalItemId === null) return;
@@ -924,22 +910,12 @@
   document.getElementById('modal-days-done').addEventListener('click', () => closeModal($modalDays));
 
   // ---- Klik tombol "Absen Sekarang" atau kotak hari di kartu ----
-  $cardsGrid.addEventListener('click', e => {
-    const claimBtn = e.target.closest('.btn-claim');
-    if (claimBtn) {
-      claimAttendance(claimBtn.dataset.itemId);
-      return;
-    }
-    const cell = e.target.closest('.day-cell');
-    if (!cell) return;
-    const itemId = cell.dataset.itemId;
-    const dayIdx = parseInt(cell.dataset.day);
-    const item = data.find(d => d.id === itemId);
-    if (!item) return;
-    item.attendance[dayIdx] = !item.attendance[dayIdx];
-    saveData();
-    render();
-  });
+$cardsGrid.addEventListener('click', e => {
+  const claimBtn = e.target.closest('.btn-claim');
+  if (claimBtn) {
+    claimAttendance(claimBtn.dataset.itemId);
+  }
+});
 
   // ---- Public API for inline handlers ----
   window.AbsensiMap = {
