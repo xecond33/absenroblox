@@ -243,7 +243,7 @@ body::before {
   color: var(--accent);
   font-size: 0.82rem;
   font-weight: 600;
-  cursor: default;
+  cursor: pointer;
   padding: 4px;
   display: block;
   margin: 0 auto;
@@ -850,7 +850,7 @@ body::before {
   border-radius: 6px;
   font-size: 0.65rem;
   font-weight: 600;
-  cursor: pointer;
+  cursor: default;
   border: 1px solid var(--border);
   background: var(--bg-primary);
   color: var(--text-muted);
