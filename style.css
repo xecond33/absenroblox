@@ -859,19 +859,6 @@ body::before {
   -webkit-tap-highlight-color: transparent;
 }
 
-.day-cell:hover {
-  border-color: var(--accent);
-  color: var(--text-primary);
-  background: var(--accent-dim);
-}
-
-.day-cell.checked {
-  background: var(--accent);
-  border-color: var(--accent);
-  color: #fff;
-  box-shadow: 0 0 8px var(--accent-glow);
-}
-
 .day-cell.checked:hover {
   background: var(--accent-light);
   border-color: var(--accent-light);
