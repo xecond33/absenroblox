@@ -859,11 +859,15 @@ body::before {
   -webkit-tap-highlight-color: transparent;
 }
 
-.day-cell.checked:hover {
-  background: var(--accent-light);
-  border-color: var(--accent-light);
+/* Sudah absen: ungu menyala */
+.day-cell.checked {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+  box-shadow: 0 0 8px var(--accent-glow);
 }
 
+/* Hari terakhir yang dicentang: garis kuning */
 .day-cell.last-checked {
   box-shadow: 0 0 0 2px var(--warning) inset;
 }
